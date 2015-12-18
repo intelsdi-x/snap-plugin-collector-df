@@ -1,0 +1,16 @@
+{
+	"ImportPath": "github.com/intelsdi-x/snap-plugin-collector-df",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.7.3",
+			"Rev": "55eb11d21d2a31a3cc93838241d04800f52e823d"
+		},
+		{
+			"ImportPath": "github.com/intelsdi-x/snap",
+			"Comment": "v0.9.0-beta",
+			"Rev": "e62bd3b4bb1e5044bad152d9a90bf8bbfa881e8f"
+		}
+	]
+}
