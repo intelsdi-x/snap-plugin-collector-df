@@ -15,11 +15,10 @@ limitations under the License.
 package main
 
 import (
-	_ "fmt"
 	"os"
 
-	"github.com/intelsdi-x/snap/control/plugin"
 	"github.com/intelsdi-x/snap-plugin-collector-df/df"
+	"github.com/intelsdi-x/snap/control/plugin"
 )
 
 func main() {

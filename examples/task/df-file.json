@@ -1,0 +1,23 @@
+{
+    "version": 1,
+    "schedule": {
+        "type": "simple",
+        "interval": "5s"
+    },
+    "workflow": {
+        "collect": {
+            "metrics": {
+		        "/intel/linux/filesystem/rootfs/space_free": {},
+                "/intel/linux/filesystem/rootfs/space_reserved": {},
+                "/intel/linux/filesystem/rootfs/inodes_percent_free": {},
+                "/intel/linux/filesystem/rootfs/inodes_percent_used": {},
+                "/intel/linux/filesystem/rootfs/device_name": {},
+                "/intel/linux/filesystem/sys_fs_cgroup/inodes_used": {}
+           },
+            "config": {
+            },
+            "process": null,
+            "publish": null
+        }
+    }
+}
