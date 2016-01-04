@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	// Name of plugin
+	// PluginName df collector plugin name
 	PluginName = "df"
 	// Version of plugin
 	Version = 1
@@ -108,11 +108,11 @@ func (p *dfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.Pl
 				case "space_used":
 					metric.Data_ = dfm.Used
 				case "space_percent_free":
-					metric.Data_ = float64(dfm.Available) / float64(dfm.Blocks)
+					metric.Data_ = 100 * float64(dfm.Available) / float64(dfm.Blocks)
 				case "space_percent_reserved":
-					metric.Data_ = float64(dfm.Blocks-(dfm.Used+dfm.Available)) / float64(dfm.Blocks)
+					metric.Data_ = 100 * float64(dfm.Blocks-(dfm.Used+dfm.Available)) / float64(dfm.Blocks)
 				case "space_percent_used":
-					metric.Data_ = float64(dfm.Used) / float64(dfm.Blocks)
+					metric.Data_ = 100 * float64(dfm.Used) / float64(dfm.Blocks)
 				case "device_name":
 					metric.Data_ = dfm.Filesystem
 				case "device_type":
@@ -124,11 +124,11 @@ func (p *dfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.Pl
 				case "inodes_used":
 					metric.Data_ = dfm.IUsed
 				case "inodes_percent_free":
-					metric.Data_ = float64(dfm.IFree) / float64(dfm.Inodes)
+					metric.Data_ = 100 * float64(dfm.IFree) / float64(dfm.Inodes)
 				case "inodes_percent_reserved":
-					metric.Data_ = float64(dfm.Inodes-(dfm.IUsed+dfm.IFree)) / float64(dfm.Inodes)
+					metric.Data_ = 100 * float64(dfm.Inodes-(dfm.IUsed+dfm.IFree)) / float64(dfm.Inodes)
 				case "inodes_percent_used":
-					metric.Data_ = float64(dfm.IUsed) / float64(dfm.Inodes)
+					metric.Data_ = 100 * float64(dfm.IUsed) / float64(dfm.Inodes)
 				}
 				metrics = append(metrics, metric)
 			}
@@ -175,7 +175,7 @@ type collector interface {
 type dfStats struct{}
 
 func (dfs *dfStats) collect() ([]dfMetric, error) {
-	dfms := make([]dfMetric, 0)
+	dfms := []dfMetric{}
 	kBOutputB, err := exec.Command("df", optionsKB...).Output()
 	if err != nil {
 		return dfms, err
