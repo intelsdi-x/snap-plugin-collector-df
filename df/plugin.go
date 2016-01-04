@@ -16,208 +16,236 @@ package df
 
 import (
 	"fmt"
-	"github.com/intelsdi-x/snap/control/plugin"
-	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/intelsdi-x/snap/control/plugin"
+	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 )
 
 const (
-	// Name of plugin
-	Name = "df"
+	// PluginName df collector plugin name
+	PluginName = "df"
 	// Version of plugin
 	Version = 1
 	// Type of plugin
 	Type = plugin.CollectorPluginType
 )
 
-type DfCollector struct {
-}
-
-type Metric struct {
-	Filesystem      string
-	Used, Available uint64
-	Percentage      float64
-	FsType          string
-	MountPoint      string
-	Inode           bool
-}
-
-var optionsKB = []string{"--no-sync", "-P", "-T"}
-var optionsINode = []string{"--no-sync", "-P", "-T", "-i"}
-var namespacePrefix = []string{"intel", "disk"}
-var metricsKind = []string{"fs_type", "mount_point", "available_space", "used_space", "percentage_space"}
-
-func makeNamespace(metrics Metric, kind string) []string {
-	ns := []string{}
-	ns = append(ns, namespacePrefix...)
-	if strings.Contains(metrics.Filesystem, "/") {
-		ns = append(ns, strings.Split(metrics.Filesystem, "/")[1:]...) // drop first element from array
-	} else {
-		ns = append(ns, metrics.Filesystem)
+var (
+	optionsKB       = []string{"--no-sync", "-P", "-T"}
+	optionsINode    = []string{"--no-sync", "-P", "-T", "-i"}
+	namespacePrefix = []string{"intel", "linux", "filesystem"}
+	metricsKind     = []string{
+		"space_free",
+		"space_reserved",
+		"space_used",
+		"space_percent_free",
+		"space_percent_reserved",
+		"space_percent_used",
+		"inodes_free",
+		"inodes_reserved",
+		"inodes_used",
+		"inodes_percent_free",
+		"inodes_percent_reserved",
+		"inodes_percent_used",
+		"device_name",
+		"device_type",
 	}
-	if kind == "mount_point" || kind == "fs_type" {
-		ns = append(ns, kind)
-	} else {
-		ns = append(ns, "space")
-		metric := ""
-		metric += kind
-		if metrics.Inode {
-			metric += "_inodes"
-		} else {
-			metric += "_kB"
+)
+
+// GetMetricTypes returns list of available metric types
+// It returns error in case retrieval was not successful
+func (p *dfCollector) GetMetricTypes(_ plugin.PluginConfigType) ([]plugin.PluginMetricType, error) {
+	mts := []plugin.PluginMetricType{}
+	dfms, err := p.stats.collect()
+
+	if err != nil {
+		return mts, fmt.Errorf(fmt.Sprintf("Unable to get available metrics from df: %s", err))
+	}
+
+	for _, dfm := range dfms {
+		for _, kind := range metricsKind {
+			mt := plugin.PluginMetricType{Namespace_: makeNamespace(dfm, kind)}
+			mts = append(mts, mt)
 		}
-		ns = append(ns, metric)
 	}
-	return ns
+
+	return mts, nil
 }
 
-func collect() ([]Metric, error) {
-	metrics := make([]Metric, 0)
-	kBOutputB, err := exec.Command("df", optionsKB...).Output()
+// CollectMetrics returns list of requested metric values
+// It returns error in case retrieval was not successful
+func (p *dfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.PluginMetricType, error) {
+	metrics := []plugin.PluginMetricType{}
+	dfms, err := p.stats.collect()
 	if err != nil {
-		return metrics, err
+		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
-	InodeOutput, err := exec.Command("df", optionsINode...).Output()
-	if err != nil {
-		return metrics, err
-	}
-	stringkB := string(kBOutputB)
-	stringInode := string(InodeOutput)
-	lineskB := strings.Split(stringkB, "\n")
-	linesInode := strings.Split(stringInode, "\n")
-	data := [][]string{lineskB, linesInode}
-	for _, dat := range data {
-		for _, line := range dat {
-			columns := strings.Fields(line)
-			if len(columns) < 8 && len(columns) > 0 { //check if not line with columns description or not empty
-				if columns[0] != "none" { //check if no none device in df
-					var metric Metric
-					if strings.Contains(dat[0], "IUsed") { //check header of command output
-						metric.Inode = true
-					} else {
-						metric.Inode = false
-					}
-					// fill struct fields
-					metric.Filesystem = columns[0]
-					metric.FsType = columns[1]
-					metric.Used, _ = strconv.ParseUint(columns[3], 10, 64)
-					metric.Available, _ = strconv.ParseUint(columns[4], 10, 64)
-					metric.Percentage, _ = strconv.ParseFloat(columns[5], 10)
-					metric.MountPoint = columns[6]
-					metrics = append(metrics, metric)
+
+	hostname, _ := os.Hostname()
+	for _, mt := range mts {
+
+		namespace := mt.Namespace()
+		if len(namespace) < 5 {
+			return nil, fmt.Errorf("Wrong namespace length %d", len(namespace))
+		}
+
+		for _, dfm := range dfms {
+
+			if validateMetric(namespace[3:], dfm) {
+
+				kind := namespace[4]
+				metric := plugin.PluginMetricType{Timestamp_: time.Now(), Source_: hostname, Namespace_: namespace}
+				switch kind {
+				case "space_free":
+					metric.Data_ = dfm.Available
+				case "space_reserved":
+					metric.Data_ = dfm.Blocks - (dfm.Used + dfm.Available)
+				case "space_used":
+					metric.Data_ = dfm.Used
+				case "space_percent_free":
+					metric.Data_ = 100 * float64(dfm.Available) / float64(dfm.Blocks)
+				case "space_percent_reserved":
+					metric.Data_ = 100 * float64(dfm.Blocks-(dfm.Used+dfm.Available)) / float64(dfm.Blocks)
+				case "space_percent_used":
+					metric.Data_ = 100 * float64(dfm.Used) / float64(dfm.Blocks)
+				case "device_name":
+					metric.Data_ = dfm.Filesystem
+				case "device_type":
+					metric.Data_ = dfm.FsType
+				case "inodes_free":
+					metric.Data_ = dfm.IFree
+				case "inodes_reserved":
+					metric.Data_ = dfm.Inodes - (dfm.IUsed + dfm.IFree)
+				case "inodes_used":
+					metric.Data_ = dfm.IUsed
+				case "inodes_percent_free":
+					metric.Data_ = 100 * float64(dfm.IFree) / float64(dfm.Inodes)
+				case "inodes_percent_reserved":
+					metric.Data_ = 100 * float64(dfm.Inodes-(dfm.IUsed+dfm.IFree)) / float64(dfm.Inodes)
+				case "inodes_percent_used":
+					metric.Data_ = 100 * float64(dfm.IUsed) / float64(dfm.Inodes)
 				}
+				metrics = append(metrics, metric)
 			}
 		}
 	}
 	return metrics, nil
 }
 
-// validate if metric should be exposed
-func validateMetric(namespace []string, metrics []plugin.PluginMetricType) bool {
-	for _, metric := range metrics {
-		if strings.Join(namespace, "/") == strings.Join(metric.Namespace_, "/") { //check if namespace is in mts
-			return true
-		}
-	}
-	return false
-}
-
-func (p *DfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.PluginMetricType, error) {
-	metrics := []plugin.PluginMetricType{}
-	data, err := collect()
-	if err != nil {
-		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
-	}
-	timestamp := time.Now()
-	hostname, _ := os.Hostname()
-	metric := plugin.PluginMetricType{}
-	for _, record := range data { //data is array of structs which contains all metrics per line
-		metric = plugin.PluginMetricType{
-			Namespace_: makeNamespace(record, "available_space"),
-			Data_:      record.Available,
-			Timestamp_: timestamp,
-			Source_:    hostname,
-		}
-		if validateMetric(metric.Namespace_, mts) {
-			metrics = append(metrics, metric)
-		}
-		metric = plugin.PluginMetricType{
-			Namespace_: makeNamespace(record, "used_space"),
-			Data_:      record.Used,
-			Timestamp_: timestamp,
-			Source_:    hostname,
-		}
-		if validateMetric(metric.Namespace_, mts) {
-			metrics = append(metrics, metric)
-		}
-		metric = plugin.PluginMetricType{
-			Namespace_: makeNamespace(record, "percentage_space"),
-			Data_:      record.Percentage,
-			Timestamp_: timestamp,
-			Source_:    hostname,
-		}
-		if validateMetric(metric.Namespace_, mts) {
-			metrics = append(metrics, metric)
-		}
-		metric = plugin.PluginMetricType{
-			Namespace_: makeNamespace(record, "mount_point"),
-			Data_:      record.MountPoint,
-			Timestamp_: timestamp,
-			Source_:    hostname,
-		}
-		if validateMetric(metric.Namespace_, mts) && !validateMetric(metric.Namespace_, metrics) { //validate if metric is not doubled
-			metrics = append(metrics, metric)
-		}
-		metric = plugin.PluginMetricType{
-			Namespace_: makeNamespace(record, "fs_type"),
-			Data_:      record.FsType,
-			Timestamp_: timestamp,
-			Source_:    hostname,
-		}
-		if validateMetric(metric.Namespace_, mts) && !validateMetric(metric.Namespace_, metrics) { //validate if metric is not doubled
-			metrics = append(metrics, metric)
-		}
-	}
-	return metrics, nil
-}
-
-func (p *DfCollector) GetMetricTypes(_ plugin.PluginConfigType) ([]plugin.PluginMetricType, error) {
-	mts := []plugin.PluginMetricType{}
-	data, err := collect()
-	if err != nil {
-		return mts, fmt.Errorf(fmt.Sprintf("Unable to get available metrics from df: %s", err))
-	}
-	for _, c := range data {
-		mt := plugin.PluginMetricType{Namespace_: makeNamespace(c, "available_space")}
-		mts = append(mts, mt)
-		mt = plugin.PluginMetricType{Namespace_: makeNamespace(c, "used_space")}
-		mts = append(mts, mt)
-		mt = plugin.PluginMetricType{Namespace_: makeNamespace(c, "percentage_space")}
-		mts = append(mts, mt)
-		mt = plugin.PluginMetricType{Namespace_: makeNamespace(c, "mount_point")}
-		mts = append(mts, mt)
-		mt = plugin.PluginMetricType{Namespace_: makeNamespace(c, "fs_type")}
-		mts = append(mts, mt)
-	}
-	return mts, nil
-}
-
-// GetConfigPolicy
-func (p *DfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
+// GetConfigPolicy returns config policy
+// It returns error in case retrieval was not successful
+func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	c := cpolicy.New()
 	return c, nil
 }
 
-// Creates new instance of plugin and returns pointer to initialized object.
-func NewDfCollector() *DfCollector {
-	return &DfCollector{}
+// NewDfCollector creates new instance of plugin and returns pointer to initialized object.
+func NewDfCollector() *dfCollector {
+	return &dfCollector{stats: &dfStats{}}
 }
 
-// Returns plugin's metadata
+// Meta returns plugin's metadata
 func Meta() *plugin.PluginMeta {
-	return plugin.NewPluginMeta(Name, Version, Type, []string{plugin.SnapGOBContentType}, []string{plugin.SnapGOBContentType})
+	return plugin.NewPluginMeta(PluginName, Version, Type, []string{plugin.SnapGOBContentType}, []string{plugin.SnapGOBContentType})
+}
+
+type dfCollector struct {
+	stats collector
+}
+
+type dfMetric struct {
+	Filesystem              string
+	Used, Available, Blocks uint64
+	Capacity                float64
+	FsType                  string
+	MountPoint              string
+	Inodes, IUsed, IFree    uint64
+	IUse                    float64
+}
+
+type collector interface {
+	collect() ([]dfMetric, error)
+}
+
+type dfStats struct{}
+
+func (dfs *dfStats) collect() ([]dfMetric, error) {
+	dfms := []dfMetric{}
+	kBOutputB, err := exec.Command("df", optionsKB...).Output()
+	if err != nil {
+		return dfms, err
+	}
+	InodeOutput, err := exec.Command("df", optionsINode...).Output()
+	if err != nil {
+		return dfms, err
+	}
+	stringkB := string(kBOutputB)
+	stringInode := string(InodeOutput)
+	lineskB := strings.Split(stringkB, "\n")
+	linesInode := strings.Split(stringInode, "\n")
+	if len(linesInode) != len(lineskB) {
+		return nil, fmt.Errorf("Inodes stats not comparable to space stats!")
+	}
+
+	for i := 0; i < len(linesInode); i++ {
+		inodeEntry := strings.Fields(linesInode[i])
+		spaceEntry := strings.Fields(lineskB[i])
+		if len(spaceEntry) < 8 && len(spaceEntry) > 0 { //check if not line with columns description or not empty
+			var dfm dfMetric
+			dfm.Filesystem = spaceEntry[0]
+			dfm.FsType = spaceEntry[1]
+			dfm.Blocks, _ = strconv.ParseUint(spaceEntry[2], 10, 64)
+			dfm.Used, _ = strconv.ParseUint(spaceEntry[3], 10, 64)
+			dfm.Available, _ = strconv.ParseUint(spaceEntry[4], 10, 64)
+			dfm.Capacity, _ = parsePerc(spaceEntry[5])
+			dfm.Inodes, _ = strconv.ParseUint(inodeEntry[2], 10, 64)
+			dfm.IUsed, _ = strconv.ParseUint(inodeEntry[3], 10, 64)
+			dfm.IFree, _ = strconv.ParseUint(inodeEntry[4], 10, 64)
+			dfm.IUse, _ = parsePerc(inodeEntry[5])
+			if spaceEntry[6] == "/" {
+				dfm.MountPoint = "rootfs"
+			} else {
+				dfm.MountPoint = strings.Replace(spaceEntry[6][1:], "/", "_", -1)
+			}
+			dfms = append(dfms, dfm)
+		}
+
+	}
+	return dfms, nil
+}
+
+func makeNamespace(dfm dfMetric, kind string) []string {
+	ns := []string{}
+
+	ns = append(ns, namespacePrefix...)
+	ns = append(ns, dfm.MountPoint, kind)
+
+	return ns
+}
+
+// validate if metric should be exposed
+func validateMetric(namespace []string, dfm dfMetric) bool {
+	mountPoint := namespace[0]
+	if mountPoint == dfm.MountPoint {
+		return true
+	}
+
+	return false
+}
+
+func parsePerc(s string) (float64, error) {
+	length := len(s)
+	if string(s[length-1]) != "%" {
+		return 0, fmt.Errorf("Wrong format")
+	}
+	ret, err := strconv.ParseFloat(s[:length-1], 10)
+	if err != nil {
+		return 0, err
+	}
+	return ret / 100, nil
 }

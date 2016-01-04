@@ -45,14 +45,20 @@ This plugin has the ability to gather the following metrics:
 
 Namespace | Data Type | Description (optional)
 ----------|-----------|-----------------------
-/intel/disk/{file_system}/space/available_space_inodes | uint64 | Available inodes
-/intel/disk/{file_system}/space/available_space_kB | uint64 | Available space in kB
-/intel/disk/{file_system}/space/percentage_space_inodes | float64 | Available percentage of inodes
-/intel/disk/{file_system}/space/percentage_space_kB | float64 | Available percentage of space in kB
-/intel/disk/{file_system}/space/used_space_inodes | uint64 | Used inodes
-/intel/disk/{file_system}/space/used_space_kB | uint64 | Used space in kB
-/intel/disk/{file_system}/fs_type | string | File system type
-/intel/disk/{file_system}/mount_point | string | Mount point of device
+/intel/linux/filesystem/\<mount_point\>/inodes_free | uint64 | the number of free inodes on the file system
+/intel/linux/filesystem/\<mount_point\>/inodes_reserved | uint64 | the number of reserved inodes
+/intel/linux/filesystem/\<mount_point\>/inodes_used | uint64 | the number of used inodes
+/intel/linux/filesystem/\<mount_point\>/space_free | uint64 | the number of free bytes
+/intel/linux/filesystem/\<mount_point\>/space_reserved | uint64 | the number of reserved bytes
+/intel/linux/filesystem/\<mount_point\>/space_used | uint64 | the number of used bytes
+/intel/linux/filesystem/\<mount_point\>/inodes_percent_free | float64 | the percentage of free inodes on the file system
+/intel/linux/filesystem/\<mount_point\>/inodes_percent_reserved | float64 | the percentage of reserved inodes
+/intel/linux/filesystem/\<mount_point\>/inodes_percent_used | float64 | the percentage of used inodes
+/intel/linux/filesystem/\<mount_point\>/space_percent_free | float64 | the percentage of free bytes
+/intel/linux/filesystem/\<mount_point\>/space_percent_reserved | float64 | the percentage of reserved bytes
+/intel/linux/filesystem/\<mount_point\>/space_percent_used | float64 | the percentage of used bytes
+/intel/linux/filesystem/\<mount_point\>/device_name | string | device name as presented in filesystem (eg. /dev/sda1)
+/intel/linux/filesystem/\<mount_point\>/device_type | string | device type as presented in filesystem (eg. ext4)
 
 ### Examples
 Example task manifest to use df plugin:
@@ -66,24 +72,12 @@ Example task manifest to use df plugin:
     "workflow": {
         "collect": {
             "metrics": {
-		        "/intel/disk/dev/sda1/space/available_space_inodes": {},
-                "/intel/disk/dev/sda1/space/available_space_kB": {},
-                "/intel/disk/dev/sda1/space/percentage_space_inodes": {},
-                "/intel/disk/dev/sda1/space/percentage_space_kB": {},
-                "/intel/disk/dev/sda1/space/used_space_inodes": {},
-                "/intel/disk/dev/sda1/space/used_space_kB": {},
-                "/intel/disk/dev/sda2/space/available_space_inodes": {},
-                "/intel/disk/dev/sda2/space/available_space_kB": {},
-                "/intel/disk/dev/sda2/space/percentage_space_inodes": {},
-                "/intel/disk/dev/sda2/space/percentage_space_kB": {},
-                "/intel/disk/dev/sda2/space/used_space_inodes": {},
-                "/intel/disk/dev/sda2/space/used_space_kB": {},
-                "/intel/disk/tmpfs/space/available_space_inodes": {},
-                "/intel/disk/tmpfs/space/available_space_kB": {},
-                "/intel/disk/tmpfs/space/percentage_space_inodes": {},
-                "/intel/disk/tmpfs/space/percentage_space_kB": {},
-                "/intel/disk/tmpfs/space/used_space_inodes": {},
-                "/intel/disk/tmpfs/space/used_space_kB": {}
+		        "/intel/linux/filesystem/rootfs/space_free": {},
+                "/intel/linux/filesystem/rootfs/space_reserved": {},
+                "/intel/linux/filesystem/rootfs/inodes_percent_free": {},
+                "/intel/linux/filesystem/rootfs/inodes_percent_used": {},
+                "/intel/linux/filesystem/rootfs/device_name": {},
+                "/intel/linux/filesystem/sys_fs_cgroup/inodes_used": {}
            },
             "config": {
             },
@@ -113,5 +107,6 @@ There's more than one way to give back, from examples to blogs to code updates. 
 ## Acknowledgements
 
 * Author: [Patryk Matyjasek](https://github.com/PatrykMatyjasek)
+* Author: [Marcin Krolik](https://github.com/marcin-krolik)
 
 And **thank you!** Your contribution, through code and participation, is incredibly important to us.
