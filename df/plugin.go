@@ -38,7 +38,7 @@ const (
 var (
 	optionsKB       = []string{"--no-sync", "-P", "-T"}
 	optionsINode    = []string{"--no-sync", "-P", "-T", "-i"}
-	namespacePrefix = []string{"intel", "linux", "filesystem"}
+	namespacePrefix = []string{"intel", "procfs", "filesystem"}
 	metricsKind     = []string{
 		"space_free",
 		"space_reserved",
