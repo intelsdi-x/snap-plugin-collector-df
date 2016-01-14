@@ -45,20 +45,20 @@ This plugin has the ability to gather the following metrics:
 
 Namespace | Data Type | Description (optional)
 ----------|-----------|-----------------------
-/intel/linux/filesystem/\<mount_point\>/inodes_free | uint64 | the number of free inodes on the file system
-/intel/linux/filesystem/\<mount_point\>/inodes_reserved | uint64 | the number of reserved inodes
-/intel/linux/filesystem/\<mount_point\>/inodes_used | uint64 | the number of used inodes
-/intel/linux/filesystem/\<mount_point\>/space_free | uint64 | the number of free bytes
-/intel/linux/filesystem/\<mount_point\>/space_reserved | uint64 | the number of reserved bytes
-/intel/linux/filesystem/\<mount_point\>/space_used | uint64 | the number of used bytes
-/intel/linux/filesystem/\<mount_point\>/inodes_percent_free | float64 | the percentage of free inodes on the file system
-/intel/linux/filesystem/\<mount_point\>/inodes_percent_reserved | float64 | the percentage of reserved inodes
-/intel/linux/filesystem/\<mount_point\>/inodes_percent_used | float64 | the percentage of used inodes
-/intel/linux/filesystem/\<mount_point\>/space_percent_free | float64 | the percentage of free bytes
-/intel/linux/filesystem/\<mount_point\>/space_percent_reserved | float64 | the percentage of reserved bytes
-/intel/linux/filesystem/\<mount_point\>/space_percent_used | float64 | the percentage of used bytes
-/intel/linux/filesystem/\<mount_point\>/device_name | string | device name as presented in filesystem (eg. /dev/sda1)
-/intel/linux/filesystem/\<mount_point\>/device_type | string | device type as presented in filesystem (eg. ext4)
+/intel/procfs/filesystem/\<mount_point\>/inodes_free | uint64 | the number of free inodes on the file system
+/intel/procfs/filesystem/\<mount_point\>/inodes_reserved | uint64 | the number of reserved inodes
+/intel/procfs/filesystem/\<mount_point\>/inodes_used | uint64 | the number of used inodes
+/intel/procfs/filesystem/\<mount_point\>/space_free | uint64 | the number of free bytes
+/intel/procfs/filesystem/\<mount_point\>/space_reserved | uint64 | the number of reserved bytes
+/intel/procfs/filesystem/\<mount_point\>/space_used | uint64 | the number of used bytes
+/intel/procfs/filesystem/\<mount_point\>/inodes_percent_free | float64 | the percentage of free inodes on the file system
+/intel/procfs/filesystem/\<mount_point\>/inodes_percent_reserved | float64 | the percentage of reserved inodes
+/intel/procfs/filesystem/\<mount_point\>/inodes_percent_used | float64 | the percentage of used inodes
+/intel/procfs/filesystem/\<mount_point\>/space_percent_free | float64 | the percentage of free bytes
+/intel/procfs/filesystem/\<mount_point\>/space_percent_reserved | float64 | the percentage of reserved bytes
+/intel/procfs/filesystem/\<mount_point\>/space_percent_used | float64 | the percentage of used bytes
+/intel/procfs/filesystem/\<mount_point\>/device_name | string | device name as presented in filesystem (eg. /dev/sda1)
+/intel/procfs/filesystem/\<mount_point\>/device_type | string | device type as presented in filesystem (eg. ext4)
 
 ### Examples
 Example task manifest to use df plugin:
@@ -72,12 +72,12 @@ Example task manifest to use df plugin:
     "workflow": {
         "collect": {
             "metrics": {
-		        "/intel/linux/filesystem/rootfs/space_free": {},
-                "/intel/linux/filesystem/rootfs/space_reserved": {},
-                "/intel/linux/filesystem/rootfs/inodes_percent_free": {},
-                "/intel/linux/filesystem/rootfs/inodes_percent_used": {},
-                "/intel/linux/filesystem/rootfs/device_name": {},
-                "/intel/linux/filesystem/sys_fs_cgroup/inodes_used": {}
+		        "/intel/procfs/filesystem/rootfs/space_free": {},
+                "/intel/procfs/filesystem/rootfs/space_reserved": {},
+                "/intel/procfs/filesystem/rootfs/inodes_percent_free": {},
+                "/intel/procfs/filesystem/rootfs/inodes_percent_used": {},
+                "/intel/procfs/filesystem/rootfs/device_name": {},
+                "/intel/procfs/filesystem/sys_fs_cgroup/inodes_used": {}
            },
             "config": {
             },
