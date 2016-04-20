@@ -17,7 +17,14 @@
             "config": {
             },
             "process": null,
-            "publish": null
+            "publish": [
+                {
+                    "plugin_name": "file",
+                    "config": {
+                        "file": "/tmp/published_df"
+                    }
+                }
+            ]
         }
     }
 }
