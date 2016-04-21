@@ -4,7 +4,9 @@ snap plugin for collecting free space metrics from df linux tool
 
 1. [Getting Started](#getting-started)
   * [System Requirements](#system-requirements)
+  * [Operating systems](#operating-systems)
   * [Installation](#installation)
+  * [Configuration and Usage](#configuration-and-usage)
 2. [Documentation](#documentation)
   * [Collected Metrics](#collected-metrics)
   * [Examples](#examples)
@@ -16,11 +18,15 @@ snap plugin for collecting free space metrics from df linux tool
 
 ## Getting Started
 
- Plugin collects specified metrics in-band on OS level
+ Plugin collects specified metrics in-band on OS level.
 
 ### System Requirements
 
- - Linux system with df command
+* Linux system with df command
+
+### Operating systems
+All OSs currently supported by snap:
+* Linux/amd64
 
 ### Installation
 #### Download df plugin binary:
@@ -28,7 +34,9 @@ You can get the pre-built binaries for your OS and architecture at snap's [Githu
 
 #### To build the plugin binary:
 Fork https://github.com/intelsdi-x/snap-plugin-collector-df
+
 Clone repo into `$GOPATH/src/github/intelsdi-x/`:
+
 ```
 $ git clone https://github.com/<yourGithubID>/snap-plugin-collector-df
 ```
@@ -38,30 +46,49 @@ $ make
 ```
 This builds the plugin in `/build/rootfs`
 
+### Configuration and Usage
+
+* Set up the [snap framework](https://github.com/intelsdi-x/snap/blob/master/README.md#getting-started).
+* Load the plugin and create a task, see example in [Examples](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/README.md#examples).
+
 ## Documentation
 
 ### Collected Metrics
-This plugin has the ability to gather the following metrics:
 
-Namespace | Data Type | Description (optional)
-----------|-----------|-----------------------
-/intel/procfs/filesystem/\<mount_point\>/inodes_free | uint64 | the number of free inodes on the file system
-/intel/procfs/filesystem/\<mount_point\>/inodes_reserved | uint64 | the number of reserved inodes
-/intel/procfs/filesystem/\<mount_point\>/inodes_used | uint64 | the number of used inodes
-/intel/procfs/filesystem/\<mount_point\>/space_free | uint64 | the number of free bytes
-/intel/procfs/filesystem/\<mount_point\>/space_reserved | uint64 | the number of reserved bytes
-/intel/procfs/filesystem/\<mount_point\>/space_used | uint64 | the number of used bytes
-/intel/procfs/filesystem/\<mount_point\>/inodes_percent_free | float64 | the percentage of free inodes on the file system
-/intel/procfs/filesystem/\<mount_point\>/inodes_percent_reserved | float64 | the percentage of reserved inodes
-/intel/procfs/filesystem/\<mount_point\>/inodes_percent_used | float64 | the percentage of used inodes
-/intel/procfs/filesystem/\<mount_point\>/space_percent_free | float64 | the percentage of free bytes
-/intel/procfs/filesystem/\<mount_point\>/space_percent_reserved | float64 | the percentage of reserved bytes
-/intel/procfs/filesystem/\<mount_point\>/space_percent_used | float64 | the percentage of used bytes
-/intel/procfs/filesystem/\<mount_point\>/device_name | string | device name as presented in filesystem (eg. /dev/sda1)
-/intel/procfs/filesystem/\<mount_point\>/device_type | string | device type as presented in filesystem (eg. ext4)
+List of collected metrics is described in [METRICS.md](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/METRICS.md).
+
 
 ### Examples
-Example task manifest to use df plugin:
+
+Example running snap-plugin-collector-df plugin and writing data to a file.
+
+Make sure that your `$SNAP_PATH` is set, if not:
+```
+$ export SNAP_PATH=<snapDirectoryPath>/build
+```
+Other paths to files should be set according to your configuration, using a file you should indicate where it is located.
+
+In one terminal window, open the snap daemon (in this case with logging set to 1,  trust disabled):
+```
+$ $SNAP_PATH/bin/snapd -l 1 -t 0
+```
+In another terminal window:
+
+Load snap-plugin-collector-df plugin:
+```
+$ $SNAP_PATH/bin/snapctl plugin load snap-plugin-collector-df
+```
+Load file plugin for publishing:
+```
+$ $SNAP_PATH/bin/snapctl plugin load $SNAP_PATH/plugin/snap-publisher-file
+```
+See available metrics:
+
+```
+$ $SNAP_PATH/bin/snapctl metric list
+```
+
+Create a task manifest file to use snap-plugin-collector-df plugin (exemplary file in [examples/task/] (https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/examples/task/)):
 ```
 {
     "version": 1,
@@ -82,24 +109,38 @@ Example task manifest to use df plugin:
             "config": {
             },
             "process": null,
-            "publish": null
+            "publish": [
+                {
+                    "plugin_name": "file",
+                    "config": {
+                        "file": "/tmp/published_df"
+                    }
+                }
+            ]
         }
     }
 }
 
 ```
-
+Create a task:
+```
+$ $SNAP_PATH/bin/snapctl task create -t df-file.json
+```
 
 ### Roadmap
 There isn't a current roadmap for this plugin, but it is in active development. As we launch this plugin, we do not have any outstanding requirements for the next release.
 
+If you have a feature request, please add it as an [issue](https://github.com/intelsdi-x/snap-plugin-collector-users/issues) and/or submit a [pull request](https://github.com/intelsdi-x/snap-plugin-collector-users/pulls).
+
 ## Community Support
-This repository is one of **many** plugins in **snap**, a powerful telemetry framework. See the full project at http://github.com/intelsdi-x/snap To reach out to other users, head to the [main framework](https://github.com/intelsdi-x/snap#community-support)
+This repository is one of **many** plugins in **snap**, a powerful telemetry framework. See the full project at http://github.com/intelsdi-x/snap To reach out to other users, head to the [main framework](https://github.com/intelsdi-x/snap#community-support) or visit [snap Gitter channel](https://gitter.im/intelsdi-x/snap).
 
 ## Contributing
 We love contributions!
 
 There's more than one way to give back, from examples to blogs to code updates. See our recommended process in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+And **thank you!** Your contribution, through code and participation, is incredibly important to us.
 
 ## License
 [snap](http://github.com/intelsdi-x/snap), along with this plugin, is an Open Source software released under the Apache 2.0 [License](LICENSE).
@@ -108,5 +149,3 @@ There's more than one way to give back, from examples to blogs to code updates. 
 
 * Author: [Patryk Matyjasek](https://github.com/PatrykMatyjasek)
 * Author: [Marcin Krolik](https://github.com/marcin-krolik)
-
-And **thank you!** Your contribution, through code and participation, is incredibly important to us.
