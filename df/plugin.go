@@ -24,6 +24,7 @@ import (
 
 	"github.com/intelsdi-x/snap/control/plugin"
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
+	"github.com/intelsdi-x/snap/core"
 )
 
 const (
@@ -59,8 +60,8 @@ var (
 
 // GetMetricTypes returns list of available metric types
 // It returns error in case retrieval was not successful
-func (p *dfCollector) GetMetricTypes(_ plugin.PluginConfigType) ([]plugin.PluginMetricType, error) {
-	mts := []plugin.PluginMetricType{}
+func (p *dfCollector) GetMetricTypes(_ plugin.ConfigType) ([]plugin.MetricType, error) {
+	mts := []plugin.MetricType{}
 	dfms, err := p.stats.collect()
 
 	if err != nil {
@@ -69,7 +70,7 @@ func (p *dfCollector) GetMetricTypes(_ plugin.PluginConfigType) ([]plugin.Plugin
 
 	for _, dfm := range dfms {
 		for _, kind := range metricsKind {
-			mt := plugin.PluginMetricType{Namespace_: makeNamespace(dfm, kind)}
+			mt := plugin.MetricType{Namespace_: core.NewNamespace(makeNamespace(dfm, kind)...)}
 			mts = append(mts, mt)
 		}
 	}
@@ -79,8 +80,8 @@ func (p *dfCollector) GetMetricTypes(_ plugin.PluginConfigType) ([]plugin.Plugin
 
 // CollectMetrics returns list of requested metric values
 // It returns error in case retrieval was not successful
-func (p *dfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.PluginMetricType, error) {
-	metrics := []plugin.PluginMetricType{}
+func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricType, error) {
+	metrics := []plugin.MetricType{}
 	dfms, err := p.stats.collect()
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
@@ -88,8 +89,13 @@ func (p *dfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.Pl
 
 	hostname, _ := os.Hostname()
 	for _, mt := range mts {
+		tags := mt.Tags()
+		if tags == nil {
+			tags = map[string]string{}
+		}
+		tags["hostname"] = hostname
 
-		namespace := mt.Namespace()
+		namespace := mt.Namespace().Strings()
 		if len(namespace) < 5 {
 			return nil, fmt.Errorf("Wrong namespace length %d", len(namespace))
 		}
@@ -99,7 +105,11 @@ func (p *dfCollector) CollectMetrics(mts []plugin.PluginMetricType) ([]plugin.Pl
 			if validateMetric(namespace[3:], dfm) {
 
 				kind := namespace[4]
-				metric := plugin.PluginMetricType{Timestamp_: time.Now(), Source_: hostname, Namespace_: namespace}
+				metric := plugin.MetricType{
+					Timestamp_: time.Now(),
+					Tags_:      tags,
+					Namespace_: mt.Namespace(),
+				}
 				switch kind {
 				case "space_free":
 					metric.Data_ = dfm.Available
@@ -151,7 +161,13 @@ func NewDfCollector() *dfCollector {
 
 // Meta returns plugin's metadata
 func Meta() *plugin.PluginMeta {
-	return plugin.NewPluginMeta(PluginName, Version, Type, []string{plugin.SnapGOBContentType}, []string{plugin.SnapGOBContentType})
+	return plugin.NewPluginMeta(
+		PluginName,
+		Version,
+		Type,
+		[]string{plugin.SnapGOBContentType},
+		[]string{plugin.SnapGOBContentType},
+	)
 }
 
 type dfCollector struct {
