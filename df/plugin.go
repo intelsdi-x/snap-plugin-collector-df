@@ -30,7 +30,7 @@ const (
 	// PluginName df collector plugin name
 	PluginName = "df"
 	// Version of plugin
-	Version = 1
+	Version = 2
 	// Type of plugin
 	Type = plugin.CollectorPluginType
 )
