@@ -16,7 +16,6 @@ package df
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -87,14 +86,7 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
 
-	hostname, _ := os.Hostname()
 	for _, mt := range mts {
-		tags := mt.Tags()
-		if tags == nil {
-			tags = map[string]string{}
-		}
-		tags["hostname"] = hostname
-
 		namespace := mt.Namespace().Strings()
 		if len(namespace) < 5 {
 			return nil, fmt.Errorf("Wrong namespace length %d", len(namespace))
@@ -107,7 +99,6 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 				kind := namespace[4]
 				metric := plugin.MetricType{
 					Timestamp_: time.Now(),
-					Tags_:      tags,
 					Namespace_: mt.Namespace(),
 				}
 				switch kind {
