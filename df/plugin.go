@@ -33,12 +33,17 @@ const (
 	Version = 2
 	// Type of plugin
 	Type = plugin.CollectorPluginType
+
+	nsVendor = "intel"
+	nsClass  = "procfs"
+	nsType   = "filesystem"
 )
 
 var (
 	optionsKB       = []string{"--no-sync", "-P", "-T"}
 	optionsINode    = []string{"--no-sync", "-P", "-T", "-i"}
-	namespacePrefix = []string{"intel", "procfs", "filesystem"}
+	// prefix in metric namespace
+	namespacePrefix = []string{nsVendor, nsClass, nsType}
 	metricsKind     = []string{
 		"space_free",
 		"space_reserved",
@@ -141,8 +146,12 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 // GetConfigPolicy returns config policy
 // It returns error in case retrieval was not successful
 func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
-	c := cpolicy.New()
-	return c, nil
+	cp := cpolicy.New()
+	rule, _ := cpolicy.NewStringRule("proc_path", false, "/proc")
+	node := cpolicy.NewPolicyNode()
+	node.Add(rule)
+	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
+	return cp, nil
 }
 
 // NewDfCollector creates new instance of plugin and returns pointer to initialized object.
@@ -158,6 +167,7 @@ func Meta() *plugin.PluginMeta {
 		Type,
 		[]string{plugin.SnapGOBContentType},
 		[]string{plugin.SnapGOBContentType},
+		plugin.ConcurrencyCount(1),
 	)
 }
 
