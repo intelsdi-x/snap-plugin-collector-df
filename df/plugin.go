@@ -40,8 +40,8 @@ const (
 )
 
 var (
-	optionsKB       = []string{"--no-sync", "-P", "-T"}
-	optionsINode    = []string{"--no-sync", "-P", "-T", "-i"}
+	optionsKB    = []string{"--no-sync", "-P", "-T"}
+	optionsINode = []string{"--no-sync", "-P", "-T", "-i"}
 	// prefix in metric namespace
 	namespacePrefix = []string{nsVendor, nsClass, nsType}
 	metricsKind     = []string{
