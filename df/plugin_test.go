@@ -68,15 +68,17 @@ func (dfp *DfPluginSuite) SetupSuite() {
 			IUse:       0.5,
 		},
 	}
-
-	mc.On("collect").Return(dfms, nil)
+	mc.On("collect", "/proc").Return(dfms, nil)
 	dfp.mockCollector = mc
 	dfp.cfg = plugin.ConfigType{}
 }
 
 func (dfp *DfPluginSuite) TestGetMetricTypes() {
 	Convey("Given df plugin is initialized", dfp.T(), func() {
-		dfPlg := &dfCollector{dfp.mockCollector}
+		//dfPlg := NewDfCollector()
+		dfPlg := dfCollector{
+			stats: dfp.mockCollector,
+		}
 
 		Convey("When list of available metrics is requested", func() {
 			mts := []plugin.MetricType{
@@ -115,7 +117,10 @@ func (dfp *DfPluginSuite) TestGetMetricTypes() {
 
 func (dfp *DfPluginSuite) TestCollectMetrics() {
 	Convey("Given df plugin is initialized", dfp.T(), func() {
-		dfPlg := &dfCollector{dfp.mockCollector}
+		//dfPlg := NewDfCollector()
+		dfPlg := dfCollector{
+			stats: dfp.mockCollector,
+		}
 
 		Convey("When values for given metrics are requested", func() {
 
@@ -172,7 +177,7 @@ type MockCollector struct {
 	mock.Mock
 }
 
-func (mc *MockCollector) collect() ([]dfMetric, error) {
-	ret := mc.Mock.Called()
+func (mc *MockCollector) collect(p string) ([]dfMetric, error) {
+	ret := mc.Mock.Called("/proc")
 	return ret.Get(0).([]dfMetric), ret.Error(1)
 }

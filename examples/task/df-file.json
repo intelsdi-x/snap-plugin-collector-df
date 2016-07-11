@@ -7,21 +7,24 @@
     "workflow": {
         "collect": {
             "metrics": {
-		        "/intel/procfs/filesystem/rootfs/space_free": {},
+                "/intel/procfs/filesystem/rootfs/space_free": {},
                 "/intel/procfs/filesystem/rootfs/space_reserved": {},
                 "/intel/procfs/filesystem/rootfs/inodes_percent_free": {},
                 "/intel/procfs/filesystem/rootfs/inodes_percent_used": {},
                 "/intel/procfs/filesystem/rootfs/device_name": {},
                 "/intel/procfs/filesystem/sys_fs_cgroup/inodes_used": {}
-           },
+            },
             "config": {
+                "/intel/procfs/filesystem": {
+                    "proc_path": "/proc"
+                }
             },
             "process": null,
             "publish": [
                 {
                     "plugin_name": "file",
                     "config": {
-                        "file": "/tmp/published_df"
+                        "file": "/tmp/published_df.log"
                     }
                 }
             ]

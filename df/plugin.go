@@ -1,10 +1,17 @@
+// +build linux
+
 /*
 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+
 Copyright 2015 Intel Corporation
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,15 +22,22 @@ limitations under the License.
 package df
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
-	"os/exec"
-	"strconv"
+	"os"
+	"path"
 	"strings"
+	"syscall"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/intelsdi-x/snap/control/plugin"
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"github.com/intelsdi-x/snap/core"
+
+	"github.com/intelsdi-x/snap-plugin-utilities/config"
 )
 
 const (
@@ -31,14 +45,17 @@ const (
 	PluginName = "df"
 	// Version of plugin
 	Version = 2
-	// Type of plugin
-	Type = plugin.CollectorPluginType
+
+	nsVendor = "intel"
+	nsClass  = "procfs"
+	nsType   = "filesystem"
 )
 
 var (
-	optionsKB       = []string{"--no-sync", "-P", "-T"}
-	optionsINode    = []string{"--no-sync", "-P", "-T", "-i"}
-	namespacePrefix = []string{"intel", "procfs", "filesystem"}
+	//procPath source of data for metrics
+	procPath = "/proc"
+	// prefix in metric namespace
+	namespacePrefix = []string{nsVendor, nsClass, nsType}
 	metricsKind     = []string{
 		"space_free",
 		"space_reserved",
@@ -55,14 +72,47 @@ var (
 		"device_name",
 		"device_type",
 	}
+	invalidFSTypes = []string{
+		"proc",
+		"binfmt_misc",
+		"fuse.gvfsd-fuse",
+		"sysfs",
+		"cgroup",
+		"fusectl",
+		"pstore",
+		"debugfs",
+		"securityfs",
+		"devpts",
+	}
 )
+
+// Function to check properness of configuration parameter
+// and set plugin attribute accordingly
+func (p *dfCollector) setProcPath(cfg interface{}) error {
+	procPath, err := config.GetConfigItem(cfg, "proc_path")
+	if err == nil && len(procPath.(string)) > 0 {
+		procPathStats, err := os.Stat(procPath.(string))
+		if err != nil {
+			return err
+		}
+		if !procPathStats.IsDir() {
+			return errors.New(fmt.Sprintf("%s is not a directory", procPath.(string)))
+		}
+		p.proc_path = procPath.(string)
+	}
+	return nil
+}
 
 // GetMetricTypes returns list of available metric types
 // It returns error in case retrieval was not successful
-func (p *dfCollector) GetMetricTypes(_ plugin.ConfigType) ([]plugin.MetricType, error) {
-	mts := []plugin.MetricType{}
-	dfms, err := p.stats.collect()
+func (p *dfCollector) GetMetricTypes(cfg plugin.ConfigType) ([]plugin.MetricType, error) {
+	err := p.setProcPath(cfg)
+	if err != nil {
+		return nil, err
+	}
 
+	mts := []plugin.MetricType{}
+	dfms, err := p.stats.collect(p.proc_path)
 	if err != nil {
 		return mts, fmt.Errorf(fmt.Sprintf("Unable to get available metrics from df: %s", err))
 	}
@@ -80,8 +130,13 @@ func (p *dfCollector) GetMetricTypes(_ plugin.ConfigType) ([]plugin.MetricType, 
 // CollectMetrics returns list of requested metric values
 // It returns error in case retrieval was not successful
 func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricType, error) {
+	err := p.setProcPath(mts[0])
+	if err != nil {
+		return nil, err
+	}
+
 	metrics := []plugin.MetricType{}
-	dfms, err := p.stats.collect()
+	dfms, err := p.stats.collect(p.proc_path)
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
@@ -141,13 +196,22 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 // GetConfigPolicy returns config policy
 // It returns error in case retrieval was not successful
 func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
-	c := cpolicy.New()
-	return c, nil
+	cp := cpolicy.New()
+	rule, _ := cpolicy.NewStringRule("proc_path", false, "/proc")
+	node := cpolicy.NewPolicyNode()
+	node.Add(rule)
+	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
+	return cp, nil
 }
 
 // NewDfCollector creates new instance of plugin and returns pointer to initialized object.
 func NewDfCollector() *dfCollector {
-	return &dfCollector{stats: &dfStats{}}
+	logger := log.New()
+	return &dfCollector{
+		stats:     &dfStats{},
+		logger:    logger,
+		proc_path: procPath,
+	}
 }
 
 // Meta returns plugin's metadata
@@ -155,14 +219,17 @@ func Meta() *plugin.PluginMeta {
 	return plugin.NewPluginMeta(
 		PluginName,
 		Version,
-		Type,
+		plugin.CollectorPluginType,
 		[]string{plugin.SnapGOBContentType},
 		[]string{plugin.SnapGOBContentType},
+		plugin.ConcurrencyCount(1),
 	)
 }
 
 type dfCollector struct {
-	stats collector
+	stats     collector
+	logger    *log.Logger
+	proc_path string
 }
 
 type dfMetric struct {
@@ -176,54 +243,105 @@ type dfMetric struct {
 }
 
 type collector interface {
-	collect() ([]dfMetric, error)
+	collect(string) ([]dfMetric, error)
 }
 
 type dfStats struct{}
 
-func (dfs *dfStats) collect() ([]dfMetric, error) {
+func (dfs *dfStats) collect(procPath string) ([]dfMetric, error) {
 	dfms := []dfMetric{}
-	kBOutputB, err := exec.Command("df", optionsKB...).Output()
-	if err != nil {
-		return dfms, err
-	}
-	InodeOutput, err := exec.Command("df", optionsINode...).Output()
-	if err != nil {
-		return dfms, err
-	}
-	stringkB := string(kBOutputB)
-	stringInode := string(InodeOutput)
-	lineskB := strings.Split(stringkB, "\n")
-	linesInode := strings.Split(stringInode, "\n")
-	if len(linesInode) != len(lineskB) {
-		return nil, fmt.Errorf("Inodes stats not comparable to space stats!")
-	}
 
-	for i := 0; i < len(linesInode); i++ {
-		inodeEntry := strings.Fields(linesInode[i])
-		spaceEntry := strings.Fields(lineskB[i])
-		if len(spaceEntry) < 8 && len(spaceEntry) > 0 { //check if not line with columns description or not empty
+	fh, err := os.Open(path.Join(procPath, "1", "mountinfo"))
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+	scanner := bufio.NewScanner(fh)
+	for scanner.Scan() {
+		inLine := scanner.Text()
+		// https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+		// or "man proc" + look for mountinfo to see meaning of fields
+		lParts := strings.Split(inLine, " - ")
+		if len(lParts) != 2 {
+			return nil, fmt.Errorf("Wrong format %d parts found instead of 2", len(lParts))
+		}
+		leftFields := strings.Fields(lParts[0])
+		if len(leftFields) != 6 && len(leftFields) != 7 {
+			return nil, fmt.Errorf("Wrong format %d fields found on the left side instead of 6 or 7", len(leftFields))
+		}
+		rightFields := strings.Fields(lParts[1])
+		if len(rightFields) != 3 {
+			return nil, fmt.Errorf("Wrong format %d fields found on the right side instead of 7 min", len(rightFields))
+		}
+		// Keep only meaningfull filesystems
+		if !invalidFS(rightFields[0]) {
 			var dfm dfMetric
-			dfm.Filesystem = spaceEntry[0]
-			dfm.FsType = spaceEntry[1]
-			dfm.Blocks, _ = strconv.ParseUint(spaceEntry[2], 10, 64)
-			dfm.Used, _ = strconv.ParseUint(spaceEntry[3], 10, 64)
-			dfm.Available, _ = strconv.ParseUint(spaceEntry[4], 10, 64)
-			dfm.Capacity, _ = parsePerc(spaceEntry[5])
-			dfm.Inodes, _ = strconv.ParseUint(inodeEntry[2], 10, 64)
-			dfm.IUsed, _ = strconv.ParseUint(inodeEntry[3], 10, 64)
-			dfm.IFree, _ = strconv.ParseUint(inodeEntry[4], 10, 64)
-			dfm.IUse, _ = parsePerc(inodeEntry[5])
-			if spaceEntry[6] == "/" {
+			dfm.Filesystem = rightFields[1]
+			dfm.FsType = rightFields[0]
+			if leftFields[4] == "/" {
 				dfm.MountPoint = "rootfs"
 			} else {
-				dfm.MountPoint = strings.Replace(spaceEntry[6][1:], "/", "_", -1)
+				dfm.MountPoint = strings.Replace(leftFields[4][1:], "/", "_", -1)
+				// Because there are mounted FS containing dots
+				// (like /etc/resolv.conf in Docker containers)
+				// and this is incompatible with Snap metric name policies
+				dfm.MountPoint = strings.Replace(dfm.MountPoint, ".", "_", -1)
 			}
+			stat := syscall.Statfs_t{}
+			err := syscall.Statfs(leftFields[4], &stat)
+			if err != nil {
+				log.Error(fmt.Sprintf("Error getting filesystem infos for %s", leftFields[4]))
+				continue
+			}
+			// Blocks
+			dfm.Blocks = (stat.Blocks * uint64(stat.Bsize)) / 1024
+			dfm.Available = (stat.Bavail * uint64(stat.Bsize)) / 1024
+			xFree := (stat.Bfree * uint64(stat.Bsize)) / 1024
+			dfm.Used = dfm.Blocks - xFree
+			percentAvailable := ceilPercent(dfm.Used, dfm.Used+dfm.Available)
+			dfm.Capacity = percentAvailable / 100.0
+			// Inodes
+			dfm.Inodes = stat.Files
+			dfm.IFree = stat.Ffree
+			dfm.IUsed = dfm.Inodes - dfm.IFree
+			percentIUsed := ceilPercent(dfm.IUsed, dfm.Inodes)
+			dfm.IUse = percentIUsed / 100.0
 			dfms = append(dfms, dfm)
 		}
-
 	}
 	return dfms, nil
+}
+
+// Return true if filesystem should not be taken into account
+func invalidFS(fs string) bool {
+	for _, v := range invalidFSTypes {
+		if fs == v {
+			return true
+		}
+	}
+	return false
+}
+
+// Ceiling function preventing addition of math library
+func ceilPercent(v uint64, t uint64) float64 {
+	// Prevent division by 0 to occur
+	if t == 0 {
+		return 0.0
+	}
+	var v1i uint64
+	v1i = v * 100 / t
+	var v1f float64
+	v1f = float64(v) * 100.0 / float64(t)
+	var v2f float64
+	v2f = float64(v1i)
+	if v2f-1 < v1f && v1f <= v2f+1 {
+		addF := 0.0
+		if v2f < v1f {
+			addF = 1.0
+		}
+		v1f = v2f + addF
+	}
+	return v1f
 }
 
 func makeNamespace(dfm dfMetric, kind string) []string {
@@ -243,16 +361,4 @@ func validateMetric(namespace []string, dfm dfMetric) bool {
 	}
 
 	return false
-}
-
-func parsePerc(s string) (float64, error) {
-	length := len(s)
-	if string(s[length-1]) != "%" {
-		return 0, fmt.Errorf("Wrong format")
-	}
-	ret, err := strconv.ParseFloat(s[:length-1], 10)
-	if err != nil {
-		return 0, err
-	}
-	return ret / 100, nil
 }
