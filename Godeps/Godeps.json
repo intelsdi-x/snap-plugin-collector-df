@@ -13,6 +13,10 @@
 			"Comment": "v0.13.0-beta-79-ga579d11",
 			"Rev": "a579d11b579d8bf521ffc51ae3416e84543d209c"
 		},
+        {
+            "ImportPath": "github.com/intelsdi-x/snap-plugin-utilities/config",
+            "Rev": "0b327aae781a2e94b414be121d5ac4668750156c"
+        },
 		{
 			"ImportPath": "github.com/intelsdi-x/snap/control/plugin/cpolicy",
 			"Comment": "v0.13.0-beta-79-ga579d11",
