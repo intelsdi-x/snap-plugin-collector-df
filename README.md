@@ -7,6 +7,7 @@ snap plugin for collecting free space metrics from df linux tool
   * [Operating systems](#operating-systems)
   * [Installation](#installation)
   * [Configuration and Usage](#configuration-and-usage)
+    * [Docker](#docker)
 2. [Documentation](#documentation)
   * [Collected Metrics](#collected-metrics)
   * [Examples](#examples)
@@ -51,6 +52,9 @@ This builds the plugin in `/build/rootfs`
 * Set up the [snap framework](https://github.com/intelsdi-x/snap/blob/master/README.md#getting-started).
 * Load the plugin and create a task, see example in [Examples](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/README.md#examples).
 
+#### Docker 
+* This plugin is not compatible with Docker as df will get metrics from the container instead of the host machine. 
+
 ## Documentation
 
 ### Collected Metrics
@@ -89,7 +93,7 @@ $ $SNAP_PATH/bin/snapctl metric list
 ```
 
 Create a task manifest file to use snap-plugin-collector-df plugin (exemplary file in [examples/task/] (https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/examples/task/)):
-```
+```json
 {
     "version": 1,
     "schedule": {
