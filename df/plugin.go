@@ -83,6 +83,7 @@ var (
 		"debugfs",
 		"securityfs",
 		"devpts",
+		"mqueue",
 	}
 )
 
@@ -106,24 +107,15 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 // GetMetricTypes returns list of available metric types
 // It returns error in case retrieval was not successful
 func (p *dfCollector) GetMetricTypes(cfg plugin.ConfigType) ([]plugin.MetricType, error) {
-	err := p.setProcPath(cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	mts := []plugin.MetricType{}
-	dfms, err := p.stats.collect(p.proc_path)
-	if err != nil {
-		return mts, fmt.Errorf(fmt.Sprintf("Unable to get available metrics from df: %s", err))
+	for _, kind := range metricsKind {
+		mts = append(mts, plugin.MetricType{
+			Namespace_: core.NewNamespace(namespacePrefix...).
+				AddDynamicElement("filesystem", "name of filesystem").
+				AddStaticElement(kind),
+			Description_: "dynamic filesystem metric: " + kind,
+		})
 	}
-
-	for _, dfm := range dfms {
-		for _, kind := range metricsKind {
-			mt := plugin.MetricType{Namespace_: core.NewNamespace(makeNamespace(dfm, kind)...)}
-			mts = append(mts, mt)
-		}
-	}
-
 	return mts, nil
 }
 
@@ -136,61 +128,84 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 	}
 
 	metrics := []plugin.MetricType{}
+	curTime := time.Now()
 	dfms, err := p.stats.collect(p.proc_path)
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
 
 	for _, mt := range mts {
-		namespace := mt.Namespace().Strings()
-		if len(namespace) < 5 {
-			return nil, fmt.Errorf("Wrong namespace length %d", len(namespace))
+		ns := mt.Namespace()
+		if len(ns) < 5 {
+			return nil, fmt.Errorf("Wrong namespace length %d", len(ns))
 		}
-
-		for _, dfm := range dfms {
-
-			if validateMetric(namespace[3:], dfm) {
-
-				kind := namespace[4]
+		if ns[len(ns)-2].Value == "*" {
+			for _, dfm := range dfms {
+				kind := ns[len(ns)-1].Value
+				ns1 := core.NewNamespace(createNamespace(dfm.MountPoint, kind)...)
+				ns1[len(ns1)-2].Name = ns[len(ns)-2].Name
 				metric := plugin.MetricType{
-					Timestamp_: time.Now(),
-					Namespace_: mt.Namespace(),
+					Timestamp_: curTime,
+					Namespace_: ns1,
 				}
-				switch kind {
-				case "space_free":
-					metric.Data_ = dfm.Available
-				case "space_reserved":
-					metric.Data_ = dfm.Blocks - (dfm.Used + dfm.Available)
-				case "space_used":
-					metric.Data_ = dfm.Used
-				case "space_percent_free":
-					metric.Data_ = 100 * float64(dfm.Available) / float64(dfm.Blocks)
-				case "space_percent_reserved":
-					metric.Data_ = 100 * float64(dfm.Blocks-(dfm.Used+dfm.Available)) / float64(dfm.Blocks)
-				case "space_percent_used":
-					metric.Data_ = 100 * float64(dfm.Used) / float64(dfm.Blocks)
-				case "device_name":
-					metric.Data_ = dfm.Filesystem
-				case "device_type":
-					metric.Data_ = dfm.FsType
-				case "inodes_free":
-					metric.Data_ = dfm.IFree
-				case "inodes_reserved":
-					metric.Data_ = dfm.Inodes - (dfm.IUsed + dfm.IFree)
-				case "inodes_used":
-					metric.Data_ = dfm.IUsed
-				case "inodes_percent_free":
-					metric.Data_ = 100 * float64(dfm.IFree) / float64(dfm.Inodes)
-				case "inodes_percent_reserved":
-					metric.Data_ = 100 * float64(dfm.Inodes-(dfm.IUsed+dfm.IFree)) / float64(dfm.Inodes)
-				case "inodes_percent_used":
-					metric.Data_ = 100 * float64(dfm.IUsed) / float64(dfm.Inodes)
-				}
+				fillMetric(kind, dfm, &metric)
 				metrics = append(metrics, metric)
+			}
+		} else {
+			for _, dfm := range dfms {
+				if ns[len(ns)-2].Value == dfm.MountPoint {
+					metric := plugin.MetricType{
+						Timestamp_: curTime,
+						Namespace_: ns,
+					}
+					kind := ns[len(ns)-1].Value
+					fillMetric(kind, dfm, &metric)
+					metrics = append(metrics, metric)
+				}
 			}
 		}
 	}
 	return metrics, nil
+}
+
+// Function to fill metric with proper (computed) value
+func fillMetric(kind string, dfm dfMetric, metric *plugin.MetricType) {
+	switch kind {
+	case "space_free":
+		metric.Data_ = dfm.Available
+	case "space_reserved":
+		metric.Data_ = dfm.Blocks - (dfm.Used + dfm.Available)
+	case "space_used":
+		metric.Data_ = dfm.Used
+	case "space_percent_free":
+		metric.Data_ = 100 * float64(dfm.Available) / float64(dfm.Blocks)
+	case "space_percent_reserved":
+		metric.Data_ = 100 * float64(dfm.Blocks-(dfm.Used+dfm.Available)) / float64(dfm.Blocks)
+	case "space_percent_used":
+		metric.Data_ = 100 * float64(dfm.Used) / float64(dfm.Blocks)
+	case "device_name":
+		metric.Data_ = dfm.Filesystem
+	case "device_type":
+		metric.Data_ = dfm.FsType
+	case "inodes_free":
+		metric.Data_ = dfm.IFree
+	case "inodes_reserved":
+		metric.Data_ = dfm.Inodes - (dfm.IUsed + dfm.IFree)
+	case "inodes_used":
+		metric.Data_ = dfm.IUsed
+	case "inodes_percent_free":
+		metric.Data_ = 100 * float64(dfm.IFree) / float64(dfm.Inodes)
+	case "inodes_percent_reserved":
+		metric.Data_ = 100 * float64(dfm.Inodes-(dfm.IUsed+dfm.IFree)) / float64(dfm.Inodes)
+	case "inodes_percent_used":
+		metric.Data_ = 100 * float64(dfm.IUsed) / float64(dfm.Inodes)
+	}
+}
+
+// createNamespace returns namespace slice of strings composed from: vendor, class, type and components of metric name
+func createNamespace(elt string, name string) []string {
+	var suffix = []string{elt, name}
+	return append(namespacePrefix, suffix...)
 }
 
 // GetConfigPolicy returns config policy
@@ -238,6 +253,7 @@ type dfMetric struct {
 	Capacity                float64
 	FsType                  string
 	MountPoint              string
+	UnchangedMountPoint     string
 	Inodes, IUsed, IFree    uint64
 	IUse                    float64
 }
@@ -251,8 +267,10 @@ type dfStats struct{}
 func (dfs *dfStats) collect(procPath string) ([]dfMetric, error) {
 	dfms := []dfMetric{}
 
-	fh, err := os.Open(path.Join(procPath, "1", "mountinfo"))
+	cpath := path.Join(procPath, "1", "mountinfo")
+	fh, err := os.Open(cpath)
 	if err != nil {
+		log.Error(fmt.Sprintf("Got error %#v", err))
 		return nil, err
 	}
 	defer fh.Close()
@@ -278,6 +296,7 @@ func (dfs *dfStats) collect(procPath string) ([]dfMetric, error) {
 			var dfm dfMetric
 			dfm.Filesystem = rightFields[1]
 			dfm.FsType = rightFields[0]
+			dfm.UnchangedMountPoint = leftFields[4]
 			if leftFields[4] == "/" {
 				dfm.MountPoint = "rootfs"
 			} else {
