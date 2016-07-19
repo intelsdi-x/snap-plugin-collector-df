@@ -44,7 +44,7 @@ const (
 	// PluginName df collector plugin name
 	PluginName = "df"
 	// Version of plugin
-	Version = 2
+	Version = 3
 
 	nsVendor = "intel"
 	nsClass  = "procfs"
@@ -134,16 +134,17 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
 
-	for _, mt := range mts {
-		ns := mt.Namespace()
-		if len(ns) < 5 {
-			return nil, fmt.Errorf("Wrong namespace length %d", len(ns))
+	for _, m := range mts {
+		ns := m.Namespace()
+		lns := len(ns)
+		if lns < 5 {
+			return nil, fmt.Errorf("Wrong namespace length %d", lns)
 		}
-		if ns[len(ns)-2].Value == "*" {
+		if ns[lns-2].Value == "*" {
 			for _, dfm := range dfms {
-				kind := ns[len(ns)-1].Value
+				kind := ns[lns-1].Value
 				ns1 := core.NewNamespace(createNamespace(dfm.MountPoint, kind)...)
-				ns1[len(ns1)-2].Name = ns[len(ns)-2].Name
+				ns1[len(ns1)-2].Name = ns[lns-2].Name
 				metric := plugin.MetricType{
 					Timestamp_: curTime,
 					Namespace_: ns1,
@@ -153,12 +154,12 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 			}
 		} else {
 			for _, dfm := range dfms {
-				if ns[len(ns)-2].Value == dfm.MountPoint {
+				if ns[lns-2].Value == dfm.MountPoint {
 					metric := plugin.MetricType{
 						Timestamp_: curTime,
 						Namespace_: ns,
 					}
-					kind := ns[len(ns)-1].Value
+					kind := ns[lns-1].Value
 					fillMetric(kind, dfm, &metric)
 					metrics = append(metrics, metric)
 				}

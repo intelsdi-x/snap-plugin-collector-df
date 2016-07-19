@@ -75,7 +75,6 @@ func (dfp *DfPluginSuite) SetupSuite() {
 
 func (dfp *DfPluginSuite) TestGetMetricTypes() {
 	Convey("Given df plugin is initialized", dfp.T(), func() {
-		//dfPlg := NewDfCollector()
 		dfPlg := dfCollector{
 			stats: dfp.mockCollector,
 		}
@@ -117,7 +116,6 @@ func (dfp *DfPluginSuite) TestGetMetricTypes() {
 
 func (dfp *DfPluginSuite) TestCollectMetrics() {
 	Convey("Given df plugin is initialized", dfp.T(), func() {
-		//dfPlg := NewDfCollector()
 		dfPlg := dfCollector{
 			stats: dfp.mockCollector,
 		}
@@ -135,35 +133,21 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 				for _, m := range mts {
 					ns = append(ns, m.Namespace().String())
 				}
-				So(len(mts), ShouldEqual, 28)
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/space_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/space_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/space_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/space_percent_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/space_percent_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/space_percent_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/inodes_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/inodes_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/inodes_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/inodes_percent_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/inodes_percent_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/inodes_percent_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/device_name")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/rootfs/device_type")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/space_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/space_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/space_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/space_percent_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/space_percent_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/space_percent_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/inodes_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/inodes_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/inodes_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/inodes_percent_free")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/inodes_percent_reserved")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/inodes_percent_used")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/device_name")
-				So(ns, ShouldContain, "/intel/procfs/filesystem/big/device_type")
+				So(len(mts), ShouldEqual, 14)
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/space_free")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/space_reserved")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/space_used")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/space_percent_free")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/space_percent_reserved")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/space_percent_used")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/inodes_free")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/inodes_reserved")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/inodes_used")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/inodes_percent_free")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/inodes_percent_reserved")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/inodes_percent_used")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/device_name")
+				So(ns, ShouldContain, "/intel/procfs/filesystem/*/device_type")
 			})
 		})
 	})
