@@ -7,12 +7,12 @@
     "workflow": {
         "collect": {
             "metrics": {
-                "/intel/procfs/filesystem/rootfs/space_free": {},
-                "/intel/procfs/filesystem/rootfs/space_reserved": {},
-                "/intel/procfs/filesystem/rootfs/inodes_percent_free": {},
-                "/intel/procfs/filesystem/rootfs/inodes_percent_used": {},
-                "/intel/procfs/filesystem/rootfs/device_name": {},
-                "/intel/procfs/filesystem/sys_fs_cgroup/inodes_used": {}
+                "/intel/procfs/filesystem/*/space_free": {},
+                "/intel/procfs/filesystem/*/space_reserved": {},
+                "/intel/procfs/filesystem/*/inodes_percent_free": {},
+                "/intel/procfs/filesystem/*/inodes_percent_used": {},
+                "/intel/procfs/filesystem/*/device_name": {},
+                "/intel/procfs/filesystem/*/inodes_used": {}
             },
             "config": {
                 "/intel/procfs/filesystem": {
@@ -22,7 +22,7 @@
             "process": null,
             "publish": [
                 {
-                    "plugin_name": "file",
+                    "plugin_name": "mock-file",
                     "config": {
                         "file": "/tmp/published_df.log"
                     }
