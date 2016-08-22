@@ -84,6 +84,12 @@ var (
 		"securityfs",
 		"devpts",
 		"mqueue",
+		"hugetlbfs",
+		"nsfs",
+		"rpc_pipefs",
+		"devtmpfs",
+		"none",
+		"tmpfs",
 	}
 )
 
