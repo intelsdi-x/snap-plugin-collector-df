@@ -21,7 +21,10 @@ package df
 
 import (
 	"strings"
+	"sync"
 	"testing"
+
+	log "github.com/Sirupsen/logrus"
 
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/mock"
@@ -76,7 +79,10 @@ func (dfp *DfPluginSuite) SetupSuite() {
 func (dfp *DfPluginSuite) TestGetMetricTypes() {
 	Convey("Given df plugin is initialized", dfp.T(), func() {
 		dfPlg := dfCollector{
-			stats: dfp.mockCollector,
+			stats:            dfp.mockCollector,
+			logger:           log.New(),
+			initializedMutex: new(sync.Mutex),
+			proc_path:        "/proc",
 		}
 
 		Convey("When list of available metrics is requested", func() {
@@ -117,7 +123,10 @@ func (dfp *DfPluginSuite) TestGetMetricTypes() {
 func (dfp *DfPluginSuite) TestCollectMetrics() {
 	Convey("Given df plugin is initialized", dfp.T(), func() {
 		dfPlg := dfCollector{
-			stats: dfp.mockCollector,
+			stats:            dfp.mockCollector,
+			logger:           log.New(),
+			initializedMutex: new(sync.Mutex),
+			proc_path:        "/proc",
 		}
 
 		Convey("When values for given metrics are requested", func() {

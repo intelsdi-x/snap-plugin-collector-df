@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -96,6 +97,11 @@ var (
 // Function to check properness of configuration parameter
 // and set plugin attribute accordingly
 func (p *dfCollector) setProcPath(cfg interface{}) error {
+	p.initializedMutex.Lock()
+	defer p.initializedMutex.Unlock()
+	if p.initialized {
+		return nil
+	}
 	procPath, err := config.GetConfigItem(cfg, "proc_path")
 	if err == nil && len(procPath.(string)) > 0 {
 		procPathStats, err := os.Stat(procPath.(string))
@@ -107,6 +113,7 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 		}
 		p.proc_path = procPath.(string)
 	}
+	p.initialized = true
 	return nil
 }
 
@@ -229,10 +236,12 @@ func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 // NewDfCollector creates new instance of plugin and returns pointer to initialized object.
 func NewDfCollector() *dfCollector {
 	logger := log.New()
+	imutex := new(sync.Mutex)
 	return &dfCollector{
-		stats:     &dfStats{},
-		logger:    logger,
-		proc_path: procPath,
+		stats:            &dfStats{},
+		logger:           logger,
+		initializedMutex: imutex,
+		proc_path:        procPath,
 	}
 }
 
@@ -249,9 +258,11 @@ func Meta() *plugin.PluginMeta {
 }
 
 type dfCollector struct {
-	stats     collector
-	logger    *log.Logger
-	proc_path string
+	initialized      bool
+	initializedMutex *sync.Mutex
+	stats            collector
+	logger           *log.Logger
+	proc_path        string
 }
 
 type dfMetric struct {
