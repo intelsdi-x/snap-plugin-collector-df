@@ -158,36 +158,89 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 	for _, m := range mts {
 		ns := m.Namespace()
 		lns := len(ns)
-		if lns < 5 {
-			return nil, fmt.Errorf("Wrong namespace length %d", lns)
+		if lns < 4 {
+			return nil, fmt.Errorf("Wrong namespace length %d: should be at least 4", lns)
 		}
-		if ns[lns-2].Value == "*" {
-			for _, dfm := range dfms {
-				kind := ns[lns-1].Value
-				ns1 := core.NewNamespace(createNamespace(dfm.MountPoint, kind)...)
-				ns1[len(ns1)-2].Name = ns[lns-2].Name
-				metric := plugin.MetricType{
-					Timestamp_: curTime,
-					Namespace_: ns1,
-				}
-				fillMetric(kind, dfm, &metric)
-				metrics = append(metrics, metric)
+		// We can request all metrics for all devices in one shot
+		// using namespace /intel/procfs/filesystem/*
+		if lns == 4 {
+			if ns[lns-1].Value != "*" {
+				return nil, fmt.Errorf("Namespace should contain wildcard")
 			}
-		} else {
-			for _, dfm := range dfms {
-				if ns[lns-2].Value == dfm.MountPoint {
-					metric := plugin.MetricType{
-						Timestamp_: curTime,
-						Namespace_: ns,
-					}
-					kind := ns[lns-1].Value
+			for _, kind := range metricsKind {
+				for _, dfm := range dfms {
+					metric := createMetric(
+						core.NewNamespace(
+							createNamespace(dfm.MountPoint, kind)...),
+						curTime)
 					fillMetric(kind, dfm, &metric)
 					metrics = append(metrics, metric)
+				}
+			}
+		} else if ns[lns-2].Value == "*" {
+			// namespace /intel/procfs/filesystem/*/<metric>
+			kind := ns[lns-1].Value
+			// <metric> is also wildcard => get them all
+			if kind == "*" {
+				for _, skind := range metricsKind {
+					for _, dfm := range dfms {
+						metric := createMetric(
+							core.NewNamespace(
+								createNamespace(dfm.MountPoint, skind)...),
+							curTime)
+						fillMetric(skind, dfm, &metric)
+						metrics = append(metrics, metric)
+					}
+				}
+			} else {
+				// <metric> is not wildcard => getonly matching metrics
+				for _, dfm := range dfms {
+					metric := createMetric(
+						core.NewNamespace(
+							createNamespace(dfm.MountPoint, kind)...),
+						curTime)
+					fillMetric(kind, dfm, &metric)
+					metrics = append(metrics, metric)
+				}
+			}
+		} else {
+			// namespace /intel/procfs/filesystem/<fs>/<metric>
+			kind := ns[lns-1].Value
+			// <metric> is also wildcard => get them all
+			if kind == "*" {
+				for _, skind := range metricsKind {
+					for _, dfm := range dfms {
+						if ns[lns-2].Value == dfm.MountPoint {
+							metric := createMetric(
+								core.NewNamespace(
+									createNamespace(dfm.MountPoint, skind)...),
+								curTime)
+							fillMetric(skind, dfm, &metric)
+							metrics = append(metrics, metric)
+						}
+					}
+				}
+			} else {
+				for _, dfm := range dfms {
+					if ns[lns-2].Value == dfm.MountPoint {
+						metric := createMetric(ns, curTime)
+						fillMetric(kind, dfm, &metric)
+						metrics = append(metrics, metric)
+					}
 				}
 			}
 		}
 	}
 	return metrics, nil
+}
+
+func createMetric(ns core.Namespace, curTime time.Time) plugin.MetricType {
+	metric := plugin.MetricType{
+		Timestamp_: curTime,
+		Namespace_: ns,
+	}
+	ns[len(ns)-2].Name = nsType
+	return metric
 }
 
 // Function to fill metric with proper (computed) value

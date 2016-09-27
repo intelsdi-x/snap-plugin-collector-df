@@ -157,6 +157,21 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 			})
 		})
 
+		Convey("When list of metrics is requested with bad namespace", func() {
+			mts := []plugin.MetricType{
+				plugin.MetricType{
+					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "rootfs"),
+				},
+			}
+			metrics, err := dfPlg.CollectMetrics(mts)
+
+			Convey("Then error should be reported", func() {
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldContainSubstring, "Namespace should contain wildcard")
+				So(metrics, ShouldBeNil)
+			})
+		})
+
 		Convey("When list of specific metrics is requested", func() {
 			mts := []plugin.MetricType{
 				plugin.MetricType{
@@ -212,6 +227,98 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 				}
 
 				So(len(metrics), ShouldEqual, 2)
+
+				val, ok := metvals["rootfs/space_free"]
+				So(ok, ShouldBeTrue)
+				So(val, ShouldNotBeNil)
+
+				val, ok = metvals["big/space_free"]
+				So(ok, ShouldBeTrue)
+				So(val, ShouldNotBeNil)
+			})
+		})
+
+		Convey("When all available dynamic metrics are requested for given mountpoint", func() {
+			mts := []plugin.MetricType{
+				plugin.MetricType{
+					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "rootfs", "*"),
+				},
+			}
+			metrics, err := dfPlg.CollectMetrics(mts)
+
+			Convey("Then no error should be reported", func() {
+				So(err, ShouldBeNil)
+				So(metrics, ShouldNotBeNil)
+			})
+
+			Convey("Then proper metrics are returned", func() {
+				metvals := map[string]interface{}{}
+				for _, m := range metrics {
+					stat := strings.Join(m.Namespace().Strings()[3:], "/")
+					So(stat, ShouldStartWith, "rootfs")
+					metvals[stat] = m.Data()
+				}
+				So(len(metrics), ShouldEqual, 14)
+
+				val, ok := metvals["rootfs/space_free"]
+				So(ok, ShouldBeTrue)
+				So(val, ShouldNotBeNil)
+			})
+		})
+
+		Convey("When all available dynamic metrics are requested for all mountpoints", func() {
+			mts := []plugin.MetricType{
+				plugin.MetricType{
+					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "*", "*"),
+				},
+			}
+			metrics, err := dfPlg.CollectMetrics(mts)
+
+			Convey("Then no error should be reported", func() {
+				So(err, ShouldBeNil)
+				So(metrics, ShouldNotBeNil)
+			})
+
+			Convey("Then proper metrics are returned", func() {
+				metvals := map[string]interface{}{}
+				for _, m := range metrics {
+					stat := strings.Join(m.Namespace().Strings()[3:], "/")
+					metvals[stat] = m.Data()
+				}
+
+				So(len(metrics), ShouldEqual, 28)
+
+				val, ok := metvals["rootfs/space_free"]
+				So(ok, ShouldBeTrue)
+				So(val, ShouldNotBeNil)
+
+				val, ok = metvals["big/space_free"]
+				So(ok, ShouldBeTrue)
+				So(val, ShouldNotBeNil)
+			})
+		})
+
+		Convey("When list of all available dynamic metrics is requested", func() {
+			mts := []plugin.MetricType{
+				plugin.MetricType{
+					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "*"),
+				},
+			}
+			metrics, err := dfPlg.CollectMetrics(mts)
+
+			Convey("Then no error should be reported", func() {
+				So(err, ShouldBeNil)
+				So(metrics, ShouldNotBeNil)
+			})
+
+			Convey("Then proper metrics are returned", func() {
+				metvals := map[string]interface{}{}
+				for _, m := range metrics {
+					stat := strings.Join(m.Namespace().Strings()[3:], "/")
+					metvals[stat] = m.Data()
+				}
+
+				So(len(metrics), ShouldEqual, 28)
 
 				val, ok := metvals["rootfs/space_free"]
 				So(ok, ShouldBeTrue)
