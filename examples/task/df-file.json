@@ -16,7 +16,8 @@
             },
             "config": {
                 "/intel/procfs/filesystem": {
-                    "proc_path": "/proc"
+                    "proc_path": "/proc",
+                    "invalid_fs_types": "proc,binfmt_misc,fuse.gvfsd-fuse,sysfs,cgroup,fusectl,pstore,debugfs,securityfs,devpts,mqueue,hugetlbfs,nsfs,rpc_pipefs,devtmpfs,none,tmpfs"
                 }
             },
             "process": null,

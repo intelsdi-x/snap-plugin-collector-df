@@ -45,7 +45,7 @@ const (
 	// PluginName df collector plugin name
 	PluginName = "df"
 	// Version of plugin
-	Version = 3
+	Version = 4
 
 	nsVendor = "intel"
 	nsClass  = "procfs"
@@ -73,7 +73,7 @@ var (
 		"device_name",
 		"device_type",
 	}
-	invalidFSTypes = []string{
+	dfltInvalidFSTypes = []string{
 		"proc",
 		"binfmt_misc",
 		"fuse.gvfsd-fuse",
@@ -113,6 +113,16 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 		}
 		p.proc_path = procPath.(string)
 	}
+	invalidFSTypes, err := config.GetConfigItem(cfg, "invalid_fs_types")
+	if err == nil {
+		if len(invalidFSTypes.(string)) > 0 {
+			p.invalid_fs_types = strings.Split(invalidFSTypes.(string), ",")
+		} else {
+			p.invalid_fs_types = []string{}
+		}
+	} else {
+		p.invalid_fs_types = dfltInvalidFSTypes
+	}
 	p.initialized = true
 	return nil
 }
@@ -124,7 +134,7 @@ func (p *dfCollector) GetMetricTypes(cfg plugin.ConfigType) ([]plugin.MetricType
 	for _, kind := range metricsKind {
 		mts = append(mts, plugin.MetricType{
 			Namespace_: core.NewNamespace(namespacePrefix...).
-				AddDynamicElement("filesystem", "name of filesystem").
+				AddDynamicElement(nsType, "name of filesystem").
 				AddStaticElement(kind),
 			Description_: "dynamic filesystem metric: " + kind,
 		})
@@ -139,14 +149,12 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 	if err != nil {
 		return nil, err
 	}
-
 	metrics := []plugin.MetricType{}
 	curTime := time.Now()
-	dfms, err := p.stats.collect(p.proc_path)
+	dfms, err := p.stats.collect(p.proc_path, p.invalid_fs_types)
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
-
 	for _, m := range mts {
 		ns := m.Namespace()
 		lns := len(ns)
@@ -230,6 +238,8 @@ func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	node := cpolicy.NewPolicyNode()
 	node.Add(rule)
 	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
+	rule, _ = cpolicy.NewStringRule("invalid_fs_types", false, strings.Join(dfltInvalidFSTypes, ","))
+	node.Add(rule)
 	return cp, nil
 }
 
@@ -242,6 +252,7 @@ func NewDfCollector() *dfCollector {
 		logger:           logger,
 		initializedMutex: imutex,
 		proc_path:        procPath,
+		invalid_fs_types: dfltInvalidFSTypes,
 	}
 }
 
@@ -263,6 +274,7 @@ type dfCollector struct {
 	stats            collector
 	logger           *log.Logger
 	proc_path        string
+	invalid_fs_types []string
 }
 
 type dfMetric struct {
@@ -277,14 +289,13 @@ type dfMetric struct {
 }
 
 type collector interface {
-	collect(string) ([]dfMetric, error)
+	collect(string, []string) ([]dfMetric, error)
 }
 
 type dfStats struct{}
 
-func (dfs *dfStats) collect(procPath string) ([]dfMetric, error) {
+func (dfs *dfStats) collect(procPath string, invalid_fs_types []string) ([]dfMetric, error) {
 	dfms := []dfMetric{}
-
 	cpath := path.Join(procPath, "1", "mountinfo")
 	fh, err := os.Open(cpath)
 	if err != nil {
@@ -310,7 +321,10 @@ func (dfs *dfStats) collect(procPath string) ([]dfMetric, error) {
 			return nil, fmt.Errorf("Wrong format %d fields found on the right side instead of 7 min", len(rightFields))
 		}
 		// Keep only meaningfull filesystems
-		if !invalidFS(rightFields[0]) {
+		if invalidFSType(rightFields[0], invalid_fs_types) {
+			log.Debug(fmt.Sprintf("Ignoring mount point %s with FS type %s",
+				leftFields[4], rightFields[0]))
+		} else {
 			var dfm dfMetric
 			dfm.Filesystem = rightFields[1]
 			dfm.FsType = rightFields[0]
@@ -350,7 +364,7 @@ func (dfs *dfStats) collect(procPath string) ([]dfMetric, error) {
 }
 
 // Return true if filesystem should not be taken into account
-func invalidFS(fs string) bool {
+func invalidFSType(fs string, invalidFSTypes []string) bool {
 	for _, v := range invalidFSTypes {
 		if fs == v {
 			return true
@@ -383,10 +397,8 @@ func ceilPercent(v uint64, t uint64) float64 {
 
 func makeNamespace(dfm dfMetric, kind string) []string {
 	ns := []string{}
-
 	ns = append(ns, namespacePrefix...)
 	ns = append(ns, dfm.MountPoint, kind)
-
 	return ns
 }
 
@@ -396,6 +408,5 @@ func validateMetric(namespace []string, dfm dfMetric) bool {
 	if mountPoint == dfm.MountPoint {
 		return true
 	}
-
 	return false
 }
