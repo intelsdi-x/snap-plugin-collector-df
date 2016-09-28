@@ -69,9 +69,39 @@ func (dfp *DfPluginSuite) SetupSuite() {
 			IUse:       0.5,
 		},
 	}
+	dfms_unchanged := []dfMetric{
+		dfMetric{
+			Blocks:     100,
+			Used:       50,
+			Available:  40,
+			Capacity:   0.5,
+			FsType:     "ext4",
+			Filesystem: "/dev/sda1",
+			MountPoint: "/",
+			Inodes:     1000,
+			IUsed:      500,
+			IFree:      400,
+			IUse:       0.5,
+		},
+		dfMetric{
+			Blocks:     200,
+			Used:       110,
+			Available:  80,
+			Capacity:   0.3,
+			FsType:     "ext4",
+			Filesystem: "/dev/sda2",
+			MountPoint: "/big",
+			Inodes:     2000,
+			IUsed:      1000,
+			IFree:      800,
+			IUse:       0.5,
+		},
+	}
 	mc := &MockCollector{}
-	mc.On("collect", "/proc", dfltExcludedFSNames, dfltExcludedFSTypes).Return(dfms, nil)
-	mc.On("collect", "/dummy", dfltExcludedFSNames, dfltExcludedFSTypes).Return(dfms, errors.New("Fake error"))
+	mc.On("collect", "/proc", dfltExcludedFSNames, dfltExcludedFSTypes, false).Return(dfms, nil)
+	mc.On("collect", "/dummy", dfltExcludedFSNames, dfltExcludedFSTypes, false).Return(dfms, errors.New("Fake error"))
+	mc.On("collect", "/proc", dfltExcludedFSNames, dfltExcludedFSTypes, true).Return(dfms_unchanged, nil)
+	mc.On("collect", "/dummy", dfltExcludedFSNames, dfltExcludedFSTypes, true).Return(dfms, errors.New("Fake error"))
 	dfp.mockCollector = mc
 	dfp.cfg = plugin.ConfigType{}
 }
@@ -172,12 +202,17 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 		})
 
 		Convey("When list of specific metrics is requested", func() {
+
+			node := cdata.NewNode()
+			node.AddItem(KeepOriginalMountPoint, ctypes.ConfigValueBool{Value: false})
 			mts := []plugin.MetricType{
 				plugin.MetricType{
 					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "rootfs", "space_free"),
+					Config_:    node,
 				},
 				plugin.MetricType{
 					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "big", "inodes_percent_free"),
+					Config_:    node,
 				},
 			}
 			metrics, err := dfPlg.CollectMetrics(mts)
@@ -206,9 +241,12 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 		})
 
 		Convey("When one single available dynamic metrics is requested", func() {
+			node := cdata.NewNode()
+			node.AddItem(KeepOriginalMountPoint, ctypes.ConfigValueBool{Value: false})
 			mts := []plugin.MetricType{
 				plugin.MetricType{
 					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "*", "space_free"),
+					Config_:    node,
 				},
 			}
 			metrics, err := dfPlg.CollectMetrics(mts)
@@ -238,9 +276,12 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 		})
 
 		Convey("When all available dynamic metrics are requested for given mountpoint", func() {
+			node := cdata.NewNode()
+			node.AddItem(KeepOriginalMountPoint, ctypes.ConfigValueBool{Value: false})
 			mts := []plugin.MetricType{
 				plugin.MetricType{
 					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "rootfs", "*"),
+					Config_:    node,
 				},
 			}
 			metrics, err := dfPlg.CollectMetrics(mts)
@@ -266,9 +307,12 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 		})
 
 		Convey("When all available dynamic metrics are requested for all mountpoints", func() {
+			node := cdata.NewNode()
+			node.AddItem(KeepOriginalMountPoint, ctypes.ConfigValueBool{Value: false})
 			mts := []plugin.MetricType{
 				plugin.MetricType{
 					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "*", "*"),
+					Config_:    node,
 				},
 			}
 			metrics, err := dfPlg.CollectMetrics(mts)
@@ -298,9 +342,12 @@ func (dfp *DfPluginSuite) TestCollectMetrics() {
 		})
 
 		Convey("When list of all available dynamic metrics is requested", func() {
+			node := cdata.NewNode()
+			node.AddItem(KeepOriginalMountPoint, ctypes.ConfigValueBool{Value: false})
 			mts := []plugin.MetricType{
 				plugin.MetricType{
 					Namespace_: core.NewNamespace("intel", "procfs", "filesystem", "*"),
+					Config_:    node,
 				},
 			}
 			metrics, err := dfPlg.CollectMetrics(mts)
@@ -358,7 +405,7 @@ func (dfp *DfPluginSuite) TestCollect() {
 		dfPlg := NewDfCollector()
 
 		Convey("When called with non existing path", func() {
-			metrics, err := dfPlg.stats.collect("/dummy", []string{}, []string{})
+			metrics, err := dfPlg.stats.collect("/dummy", []string{}, []string{}, false)
 			Convey("Then error should be reported", func() {
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldContainSubstring, "no such file or directory")
@@ -367,7 +414,7 @@ func (dfp *DfPluginSuite) TestCollect() {
 		})
 
 		Convey("When called with existing path and different exclusion lists", func() {
-			metrics, err := dfPlg.stats.collect("/proc", []string{"dummy"}, []string{"dummy"})
+			metrics, err := dfPlg.stats.collect("/proc", []string{"dummy"}, []string{"dummy"}, false)
 			Convey("Then no error should be reported with dummy exclusion lists", func() {
 				So(err, ShouldBeNil)
 				So(metrics, ShouldNotBeNil)
@@ -384,11 +431,33 @@ func (dfp *DfPluginSuite) TestCollect() {
 				So(exclusions, ShouldEqual, true)
 			})
 
-			metrics, err = dfPlg.stats.collect("/proc", dfltExcludedFSNames, dfltExcludedFSTypes)
+			metrics, err = dfPlg.stats.collect("/proc", dfltExcludedFSNames, dfltExcludedFSTypes, false)
 			Convey("Then error should be reported", func() {
 				So(err, ShouldBeNil)
 				So(metrics, ShouldNotBeNil)
 				So(len(metrics), ShouldBeLessThan, nbMetrics)
+				testMounts := false
+				for _, m := range metrics {
+					if m.MountPoint == m.UnchangedMountPoint {
+						testMounts = true
+					}
+				}
+				So(testMounts, ShouldEqual, false)
+			})
+		})
+
+		Convey("When called with existing path keeping original mount points", func() {
+			metrics, err := dfPlg.stats.collect("/proc", dfltExcludedFSNames, dfltExcludedFSTypes, true)
+			Convey("Then error should be reported", func() {
+				So(err, ShouldBeNil)
+				So(metrics, ShouldNotBeNil)
+				testMounts := false
+				for _, m := range metrics {
+					if m.MountPoint != m.UnchangedMountPoint {
+						testMounts = true
+					}
+				}
+				So(testMounts, ShouldEqual, false)
 			})
 		})
 	})
@@ -502,6 +571,17 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 				So(err, ShouldBeNil)
 				So(len(dfPlg.excluded_fs_types), ShouldEqual, 2)
 			})
+
+			node = cdata.NewNode()
+			node.AddItem(KeepOriginalMountPoint, ctypes.ConfigValueBool{Value: false})
+			cfg = plugin.ConfigType{ConfigDataNode: node}
+			dfPlg = NewDfCollector()
+			dfPlg.stats = dfp.mockCollector
+			err = dfPlg.setProcPath(cfg)
+
+			Convey("Then no error should be reported", func() {
+				So(err, ShouldBeNil)
+			})
 		})
 
 		Convey("Set get config policy", func() {
@@ -578,7 +658,7 @@ type MockCollector struct {
 	mock.Mock
 }
 
-func (mc *MockCollector) collect(p string, n []string, f []string) ([]dfMetric, error) {
-	ret := mc.Mock.Called(p, n, f)
+func (mc *MockCollector) collect(p string, n []string, f []string, b bool) ([]dfMetric, error) {
+	ret := mc.Mock.Called(p, n, f, b)
 	return ret.Get(0).([]dfMetric), ret.Error(1)
 }

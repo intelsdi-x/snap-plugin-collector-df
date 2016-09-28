@@ -45,15 +45,17 @@ const (
 	// PluginName df collector plugin name
 	PluginName = "df"
 	// Version of plugin
-	Version = 4
+	Version = 5
 
 	nsVendor = "intel"
 	nsClass  = "procfs"
 	nsType   = "filesystem"
 
-	ProcPath        = "proc_path"
-	ExcludedFSNames = "excluded_fs_names"
-	ExcludedFSTypes = "excluded_fs_types"
+	ProcPath               = "proc_path"
+	ExcludedFSNames        = "excluded_fs_names"
+	ExcludedFSTypes        = "excluded_fs_types"
+	KeepOriginalMountPoint = "keep_original_mountpoint"
+	MountInfoFile          = "mountinfo"
 )
 
 var (
@@ -142,6 +144,10 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 	} else {
 		p.excluded_fs_types = dfltExcludedFSTypes
 	}
+	keepMount, err := config.GetConfigItem(cfg, KeepOriginalMountPoint)
+	if err == nil {
+		p.keep_original_mountpoint = keepMount.(bool)
+	}
 	p.initialized = true
 	return nil
 }
@@ -170,7 +176,7 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 	}
 	metrics := []plugin.MetricType{}
 	curTime := time.Now()
-	dfms, err := p.stats.collect(p.proc_path, p.excluded_fs_names, p.excluded_fs_types)
+	dfms, err := p.stats.collect(p.proc_path, p.excluded_fs_names, p.excluded_fs_types, p.keep_original_mountpoint)
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
@@ -310,10 +316,12 @@ func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	node := cpolicy.NewPolicyNode()
 	node.Add(rule)
 	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
-	rule, _ = cpolicy.NewStringRule(ExcludedFSNames, false, strings.Join(dfltExcludedFSNames, ","))
-	node.Add(rule)
-	rule, _ = cpolicy.NewStringRule(ExcludedFSTypes, false, strings.Join(dfltExcludedFSTypes, ","))
-	node.Add(rule)
+	rule1, _ := cpolicy.NewStringRule(ExcludedFSNames, false, strings.Join(dfltExcludedFSNames, ","))
+	node.Add(rule1)
+	rule2, _ := cpolicy.NewStringRule(ExcludedFSTypes, false, strings.Join(dfltExcludedFSTypes, ","))
+	node.Add(rule2)
+	rule3, _ := cpolicy.NewBoolRule(KeepOriginalMountPoint, false, true)
+	node.Add(rule3)
 	return cp, nil
 }
 
@@ -322,12 +330,13 @@ func NewDfCollector() *dfCollector {
 	logger := log.New()
 	imutex := new(sync.Mutex)
 	return &dfCollector{
-		stats:             &dfStats{},
-		logger:            logger,
-		initializedMutex:  imutex,
-		proc_path:         procPath,
-		excluded_fs_names: dfltExcludedFSNames,
-		excluded_fs_types: dfltExcludedFSTypes,
+		stats:                    &dfStats{},
+		logger:                   logger,
+		initializedMutex:         imutex,
+		proc_path:                procPath,
+		excluded_fs_names:        dfltExcludedFSNames,
+		excluded_fs_types:        dfltExcludedFSTypes,
+		keep_original_mountpoint: true,
 	}
 }
 
@@ -345,13 +354,14 @@ func Meta() *plugin.PluginMeta {
 }
 
 type dfCollector struct {
-	initialized       bool
-	initializedMutex  *sync.Mutex
-	stats             collector
-	logger            *log.Logger
-	proc_path         string
-	excluded_fs_names []string
-	excluded_fs_types []string
+	initialized              bool
+	initializedMutex         *sync.Mutex
+	stats                    collector
+	logger                   *log.Logger
+	proc_path                string
+	excluded_fs_names        []string
+	excluded_fs_types        []string
+	keep_original_mountpoint bool
 }
 
 type dfMetric struct {
@@ -366,14 +376,14 @@ type dfMetric struct {
 }
 
 type collector interface {
-	collect(string, []string, []string) ([]dfMetric, error)
+	collect(string, []string, []string, bool) ([]dfMetric, error)
 }
 
 type dfStats struct{}
 
-func (dfs *dfStats) collect(procPath string, excluded_fs_names []string, excluded_fs_types []string) ([]dfMetric, error) {
+func (dfs *dfStats) collect(procPath string, excluded_fs_names []string, excluded_fs_types []string, keep_original_mountpoint bool) ([]dfMetric, error) {
 	dfms := []dfMetric{}
-	cpath := path.Join(procPath, "1", "mountinfo")
+	cpath := path.Join(procPath, "1", MountInfoFile)
 	fh, err := os.Open(cpath)
 	if err != nil {
 		log.Error(fmt.Sprintf("Got error %#v", err))
@@ -412,14 +422,18 @@ func (dfs *dfStats) collect(procPath string, excluded_fs_names []string, exclude
 		dfm.Filesystem = rightFields[1]
 		dfm.FsType = rightFields[0]
 		dfm.UnchangedMountPoint = leftFields[4]
-		if leftFields[4] == "/" {
-			dfm.MountPoint = "rootfs"
+		if keep_original_mountpoint {
+			dfm.MountPoint = leftFields[4]
 		} else {
-			dfm.MountPoint = strings.Replace(leftFields[4][1:], "/", "_", -1)
-			// Because there are mounted FS containing dots
-			// (like /etc/resolv.conf in Docker containers)
-			// and this is incompatible with Snap metric name policies
-			dfm.MountPoint = strings.Replace(dfm.MountPoint, ".", "_", -1)
+			if leftFields[4] == "/" {
+				dfm.MountPoint = "rootfs"
+			} else {
+				dfm.MountPoint = strings.Replace(leftFields[4][1:], "/", "_", -1)
+				// Because there are mounted FS containing dots
+				// (like /etc/resolv.conf in Docker containers)
+				// and this is incompatible with Snap metric name policies
+				dfm.MountPoint = strings.Replace(dfm.MountPoint, ".", "_", -1)
+			}
 		}
 		stat := syscall.Statfs_t{}
 		err := syscall.Statfs(leftFields[4], &stat)
