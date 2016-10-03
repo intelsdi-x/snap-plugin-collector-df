@@ -71,8 +71,8 @@ func (dfp *DfPluginSuite) SetupSuite() {
 			IUse:       0.5,
 		},
 	}
-	mc.On("collect", "/proc", dfltInvalidFSTypes).Return(dfms, nil)
-	mc.On("collect", "/dummy", dfltInvalidFSTypes).Return(dfms, errors.New("Fake error"))
+	mc.On("collect", "/proc", dfltExcludedFSTypes).Return(dfms, nil)
+	mc.On("collect", "/dummy", dfltExcludedFSTypes).Return(dfms, errors.New("Fake error"))
 	dfp.mockCollector = mc
 	dfp.cfg = plugin.ConfigType{}
 }
@@ -436,31 +436,31 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 
 			Convey("Then no error should be reported (already called)", func() {
 				So(err, ShouldBeNil)
-				So(len(dfPlg.invalid_fs_types), ShouldEqual, 18)
+				So(len(dfPlg.excluded_fs_types), ShouldEqual, 18)
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("invalid_fs_types", ctypes.ConfigValueStr{Value: ""})
+			node.AddItem("excluded_fs_types", ctypes.ConfigValueStr{Value: ""})
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
 			cfg = plugin.ConfigType{ConfigDataNode: node}
 			err = dfPlg.setProcPath(cfg)
 
-			Convey("Then no error should be reported (invalid_fs_types with proper value for empty string)", func() {
+			Convey("Then no error should be reported (excluded_fs_types with proper value for empty string)", func() {
 				So(err, ShouldBeNil)
-				So(len(dfPlg.invalid_fs_types), ShouldEqual, 0)
+				So(len(dfPlg.excluded_fs_types), ShouldEqual, 0)
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("invalid_fs_types", ctypes.ConfigValueStr{Value: "fs1,fs2"})
+			node.AddItem("excluded_fs_types", ctypes.ConfigValueStr{Value: "fs1,fs2"})
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
 			cfg = plugin.ConfigType{ConfigDataNode: node}
 			err = dfPlg.setProcPath(cfg)
 
-			Convey("Then no error should be reported (invalid_fs_types with proper value)", func() {
+			Convey("Then no error should be reported (excluded_fs_types with proper value)", func() {
 				So(err, ShouldBeNil)
-				So(len(dfPlg.invalid_fs_types), ShouldEqual, 2)
+				So(len(dfPlg.excluded_fs_types), ShouldEqual, 2)
 			})
 		})
 
@@ -494,13 +494,13 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			l := []string{"1", "2", "3", "4"}
-			v = invalidFSType("3", l)
+			v = excludedFSType("3", l)
 
 			Convey("Then value should be reported as found", func() {
 				So(v, ShouldEqual, true)
 			})
 
-			v = invalidFSType("error", l)
+			v = excludedFSType("error", l)
 
 			Convey("Then value should be reported as not found", func() {
 				So(v, ShouldEqual, false)

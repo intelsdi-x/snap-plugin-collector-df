@@ -73,7 +73,7 @@ var (
 		"device_name",
 		"device_type",
 	}
-	dfltInvalidFSTypes = []string{
+	dfltExcludedFSTypes = []string{
 		"proc",
 		"binfmt_misc",
 		"fuse.gvfsd-fuse",
@@ -114,15 +114,15 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 		}
 		p.proc_path = procPath.(string)
 	}
-	invalidFSTypes, err := config.GetConfigItem(cfg, "invalid_fs_types")
+	excludedFSTypes, err := config.GetConfigItem(cfg, "excluded_fs_types")
 	if err == nil {
-		if len(invalidFSTypes.(string)) > 0 {
-			p.invalid_fs_types = strings.Split(invalidFSTypes.(string), ",")
+		if len(excludedFSTypes.(string)) > 0 {
+			p.excluded_fs_types = strings.Split(excludedFSTypes.(string), ",")
 		} else {
-			p.invalid_fs_types = []string{}
+			p.excluded_fs_types = []string{}
 		}
 	} else {
-		p.invalid_fs_types = dfltInvalidFSTypes
+		p.excluded_fs_types = dfltExcludedFSTypes
 	}
 	p.initialized = true
 	return nil
@@ -152,7 +152,7 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 	}
 	metrics := []plugin.MetricType{}
 	curTime := time.Now()
-	dfms, err := p.stats.collect(p.proc_path, p.invalid_fs_types)
+	dfms, err := p.stats.collect(p.proc_path, p.excluded_fs_types)
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
@@ -292,7 +292,7 @@ func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	node := cpolicy.NewPolicyNode()
 	node.Add(rule)
 	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
-	rule, _ = cpolicy.NewStringRule("invalid_fs_types", false, strings.Join(dfltInvalidFSTypes, ","))
+	rule, _ = cpolicy.NewStringRule("excluded_fs_types", false, strings.Join(dfltExcludedFSTypes, ","))
 	node.Add(rule)
 	return cp, nil
 }
@@ -302,11 +302,11 @@ func NewDfCollector() *dfCollector {
 	logger := log.New()
 	imutex := new(sync.Mutex)
 	return &dfCollector{
-		stats:            &dfStats{},
-		logger:           logger,
-		initializedMutex: imutex,
-		proc_path:        procPath,
-		invalid_fs_types: dfltInvalidFSTypes,
+		stats:             &dfStats{},
+		logger:            logger,
+		initializedMutex:  imutex,
+		proc_path:         procPath,
+		excluded_fs_types: dfltExcludedFSTypes,
 	}
 }
 
@@ -323,12 +323,12 @@ func Meta() *plugin.PluginMeta {
 }
 
 type dfCollector struct {
-	initialized      bool
-	initializedMutex *sync.Mutex
-	stats            collector
-	logger           *log.Logger
-	proc_path        string
-	invalid_fs_types []string
+	initialized       bool
+	initializedMutex  *sync.Mutex
+	stats             collector
+	logger            *log.Logger
+	proc_path         string
+	excluded_fs_types []string
 }
 
 type dfMetric struct {
@@ -348,7 +348,7 @@ type collector interface {
 
 type dfStats struct{}
 
-func (dfs *dfStats) collect(procPath string, invalid_fs_types []string) ([]dfMetric, error) {
+func (dfs *dfStats) collect(procPath string, excluded_fs_types []string) ([]dfMetric, error) {
 	dfms := []dfMetric{}
 	cpath := path.Join(procPath, "1", "mountinfo")
 	fh, err := os.Open(cpath)
@@ -375,7 +375,7 @@ func (dfs *dfStats) collect(procPath string, invalid_fs_types []string) ([]dfMet
 			return nil, fmt.Errorf("Wrong format %d fields found on the right side instead of 7 min", len(rightFields))
 		}
 		// Keep only meaningfull filesystems
-		if invalidFSType(rightFields[0], invalid_fs_types) {
+		if excludedFSType(rightFields[0], excluded_fs_types) {
 			log.Debug(fmt.Sprintf("Ignoring mount point %s with FS type %s",
 				leftFields[4], rightFields[0]))
 		} else {
@@ -418,8 +418,8 @@ func (dfs *dfStats) collect(procPath string, invalid_fs_types []string) ([]dfMet
 }
 
 // Return true if filesystem should not be taken into account
-func invalidFSType(fs string, invalidFSTypes []string) bool {
-	for _, v := range invalidFSTypes {
+func excludedFSType(fs string, excludedFSTypes []string) bool {
+	for _, v := range excludedFSTypes {
 		if fs == v {
 			return true
 		}
