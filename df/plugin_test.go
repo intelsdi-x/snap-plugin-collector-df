@@ -436,7 +436,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 
 			Convey("Then no error should be reported (already called)", func() {
 				So(err, ShouldBeNil)
-				So(len(dfPlg.invalid_fs_types), ShouldEqual, 17)
+				So(len(dfPlg.invalid_fs_types), ShouldEqual, 18)
 			})
 
 			node = cdata.NewNode()

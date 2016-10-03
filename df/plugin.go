@@ -91,6 +91,7 @@ var (
 		"devtmpfs",
 		"none",
 		"tmpfs",
+		"aufs",
 	}
 )
 
