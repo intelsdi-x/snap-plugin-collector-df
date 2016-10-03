@@ -50,6 +50,10 @@ const (
 	nsVendor = "intel"
 	nsClass  = "procfs"
 	nsType   = "filesystem"
+
+	ProcPath        = "proc_path"
+	ExcludedFSNames = "excluded_fs_names"
+	ExcludedFSTypes = "excluded_fs_types"
 )
 
 var (
@@ -107,7 +111,7 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 	if p.initialized {
 		return nil
 	}
-	procPath, err := config.GetConfigItem(cfg, "proc_path")
+	procPath, err := config.GetConfigItem(cfg, ProcPath)
 	if err == nil && len(procPath.(string)) > 0 {
 		procPathStats, err := os.Stat(procPath.(string))
 		if err != nil {
@@ -118,7 +122,7 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 		}
 		p.proc_path = procPath.(string)
 	}
-	excludedFSNames, err := config.GetConfigItem(cfg, "excluded_fs_names")
+	excludedFSNames, err := config.GetConfigItem(cfg, ExcludedFSNames)
 	if err == nil {
 		if len(excludedFSNames.(string)) > 0 {
 			p.excluded_fs_names = strings.Split(excludedFSNames.(string), ",")
@@ -128,7 +132,7 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 	} else {
 		p.excluded_fs_names = dfltExcludedFSNames
 	}
-	excludedFSTypes, err := config.GetConfigItem(cfg, "excluded_fs_types")
+	excludedFSTypes, err := config.GetConfigItem(cfg, ExcludedFSTypes)
 	if err == nil {
 		if len(excludedFSTypes.(string)) > 0 {
 			p.excluded_fs_types = strings.Split(excludedFSTypes.(string), ",")
@@ -302,13 +306,13 @@ func createNamespace(elt string, name string) []string {
 // It returns error in case retrieval was not successful
 func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	cp := cpolicy.New()
-	rule, _ := cpolicy.NewStringRule("proc_path", false, "/proc")
+	rule, _ := cpolicy.NewStringRule(ProcPath, false, "/proc")
 	node := cpolicy.NewPolicyNode()
 	node.Add(rule)
 	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
-	rule, _ = cpolicy.NewStringRule("excluded_fs_names", false, strings.Join(dfltExcludedFSNames, ","))
+	rule, _ = cpolicy.NewStringRule(ExcludedFSNames, false, strings.Join(dfltExcludedFSNames, ","))
 	node.Add(rule)
-	rule, _ = cpolicy.NewStringRule("excluded_fs_types", false, strings.Join(dfltExcludedFSTypes, ","))
+	rule, _ = cpolicy.NewStringRule(ExcludedFSTypes, false, strings.Join(dfltExcludedFSTypes, ","))
 	node.Add(rule)
 	return cp, nil
 }
@@ -441,8 +445,8 @@ func (dfs *dfStats) collect(procPath string, excluded_fs_names []string, exclude
 }
 
 // Return true if filesystem should not be taken into account
-func excludedFSFromList(fs string, excludedFS []string) bool {
-	for _, v := range excludedFS {
+func excludedFSFromList(fs string, excludeList []string) bool {
+	for _, v := range excludeList {
 		if fs == v {
 			return true
 		}

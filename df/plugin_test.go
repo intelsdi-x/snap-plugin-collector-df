@@ -82,7 +82,7 @@ func (dfp *DfPluginSuite) TestGetMetricTypes() {
 		dfPlg.stats = dfp.mockCollector
 
 		node := cdata.NewNode()
-		node.AddItem("proc_path", ctypes.ConfigValueStr{Value: "/dummy"})
+		node.AddItem(ProcPath, ctypes.ConfigValueStr{Value: "/dummy"})
 
 		Convey("When list of available metrics is requested", func() {
 			mts := []plugin.MetricType{
@@ -425,7 +425,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 		Convey("Set config variables", func() {
 
 			node := cdata.NewNode()
-			node.AddItem("proc_path", ctypes.ConfigValueStr{Value: "/etc/hosts"})
+			node.AddItem(ProcPath, ctypes.ConfigValueStr{Value: "/etc/hosts"})
 			cfg := plugin.ConfigType{ConfigDataNode: node}
 			dfPlg := NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
@@ -437,7 +437,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("proc_path", ctypes.ConfigValueStr{Value: "/proc"})
+			node.AddItem(ProcPath, ctypes.ConfigValueStr{Value: "/proc"})
 			cfg = plugin.ConfigType{ConfigDataNode: node}
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
@@ -456,7 +456,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("excluded_fs_names", ctypes.ConfigValueStr{Value: ""})
+			node.AddItem(ExcludedFSNames, ctypes.ConfigValueStr{Value: ""})
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
 			cfg = plugin.ConfigType{ConfigDataNode: node}
@@ -468,7 +468,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("excluded_fs_names", ctypes.ConfigValueStr{Value: "n1,n2,n3"})
+			node.AddItem(ExcludedFSNames, ctypes.ConfigValueStr{Value: "n1,n2,n3"})
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
 			cfg = plugin.ConfigType{ConfigDataNode: node}
@@ -480,7 +480,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("excluded_fs_types", ctypes.ConfigValueStr{Value: ""})
+			node.AddItem(ExcludedFSTypes, ctypes.ConfigValueStr{Value: ""})
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
 			cfg = plugin.ConfigType{ConfigDataNode: node}
@@ -492,7 +492,7 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			node = cdata.NewNode()
-			node.AddItem("excluded_fs_types", ctypes.ConfigValueStr{Value: "fs1,fs2"})
+			node.AddItem(ExcludedFSTypes, ctypes.ConfigValueStr{Value: "fs1,fs2"})
 			dfPlg = NewDfCollector()
 			dfPlg.stats = dfp.mockCollector
 			cfg = plugin.ConfigType{ConfigDataNode: node}
