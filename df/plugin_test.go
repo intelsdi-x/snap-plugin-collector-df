@@ -41,8 +41,6 @@ type DfPluginSuite struct {
 }
 
 func (dfp *DfPluginSuite) SetupSuite() {
-	mc := &MockCollector{}
-
 	dfms := []dfMetric{
 		dfMetric{
 			Blocks:     100,
@@ -71,8 +69,9 @@ func (dfp *DfPluginSuite) SetupSuite() {
 			IUse:       0.5,
 		},
 	}
-	mc.On("collect", "/proc", dfltExcludedFSTypes).Return(dfms, nil)
-	mc.On("collect", "/dummy", dfltExcludedFSTypes).Return(dfms, errors.New("Fake error"))
+	mc := &MockCollector{}
+	mc.On("collect", "/proc", dfltExcludedFSNames, dfltExcludedFSTypes).Return(dfms, nil)
+	mc.On("collect", "/dummy", dfltExcludedFSNames, dfltExcludedFSTypes).Return(dfms, errors.New("Fake error"))
 	dfp.mockCollector = mc
 	dfp.cfg = plugin.ConfigType{}
 }
@@ -359,8 +358,7 @@ func (dfp *DfPluginSuite) TestCollect() {
 		dfPlg := NewDfCollector()
 
 		Convey("When called with non existing path", func() {
-			metrics, err := dfPlg.stats.collect("/dummy", []string{})
-
+			metrics, err := dfPlg.stats.collect("/dummy", []string{}, []string{})
 			Convey("Then error should be reported", func() {
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldContainSubstring, "no such file or directory")
@@ -368,12 +366,29 @@ func (dfp *DfPluginSuite) TestCollect() {
 			})
 		})
 
-		Convey("When called with existing path", func() {
-			metrics, err := dfPlg.stats.collect("/proc", []string{})
+		Convey("When called with existing path and different exclusion lists", func() {
+			metrics, err := dfPlg.stats.collect("/proc", []string{"dummy"}, []string{"dummy"})
+			Convey("Then no error should be reported with dummy exclusion lists", func() {
+				So(err, ShouldBeNil)
+				So(metrics, ShouldNotBeNil)
+			})
+			nbMetrics := len(metrics)
+			exclusions := false
+			for _, m := range metrics {
+				if excludedFSFromList(m.UnchangedMountPoint, dfltExcludedFSNames) ||
+					excludedFSFromList(m.FsType, dfltExcludedFSTypes) {
+					exclusions = true
+				}
+			}
+			Convey("Then no exclusion occured", func() {
+				So(exclusions, ShouldEqual, true)
+			})
 
+			metrics, err = dfPlg.stats.collect("/proc", dfltExcludedFSNames, dfltExcludedFSTypes)
 			Convey("Then error should be reported", func() {
 				So(err, ShouldBeNil)
 				So(metrics, ShouldNotBeNil)
+				So(len(metrics), ShouldBeLessThan, nbMetrics)
 			})
 		})
 	})
@@ -437,6 +452,31 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			Convey("Then no error should be reported (already called)", func() {
 				So(err, ShouldBeNil)
 				So(len(dfPlg.excluded_fs_types), ShouldEqual, 18)
+				So(len(dfPlg.excluded_fs_names), ShouldEqual, 2)
+			})
+
+			node = cdata.NewNode()
+			node.AddItem("excluded_fs_names", ctypes.ConfigValueStr{Value: ""})
+			dfPlg = NewDfCollector()
+			dfPlg.stats = dfp.mockCollector
+			cfg = plugin.ConfigType{ConfigDataNode: node}
+			err = dfPlg.setProcPath(cfg)
+
+			Convey("Then no error should be reported (excluded_fs_names with proper value for empty string)", func() {
+				So(err, ShouldBeNil)
+				So(len(dfPlg.excluded_fs_names), ShouldEqual, 0)
+			})
+
+			node = cdata.NewNode()
+			node.AddItem("excluded_fs_names", ctypes.ConfigValueStr{Value: "n1,n2,n3"})
+			dfPlg = NewDfCollector()
+			dfPlg.stats = dfp.mockCollector
+			cfg = plugin.ConfigType{ConfigDataNode: node}
+			err = dfPlg.setProcPath(cfg)
+
+			Convey("Then no error should be reported (excluded_fs_names with proper value)", func() {
+				So(err, ShouldBeNil)
+				So(len(dfPlg.excluded_fs_names), ShouldEqual, 3)
 			})
 
 			node = cdata.NewNode()
@@ -494,13 +534,13 @@ func (dfp *DfPluginSuite) TestHelperRoutines() {
 			})
 
 			l := []string{"1", "2", "3", "4"}
-			v = excludedFSType("3", l)
+			v = excludedFSFromList("3", l)
 
 			Convey("Then value should be reported as found", func() {
 				So(v, ShouldEqual, true)
 			})
 
-			v = excludedFSType("error", l)
+			v = excludedFSFromList("error", l)
 
 			Convey("Then value should be reported as not found", func() {
 				So(v, ShouldEqual, false)
@@ -538,7 +578,7 @@ type MockCollector struct {
 	mock.Mock
 }
 
-func (mc *MockCollector) collect(p string, i []string) ([]dfMetric, error) {
-	ret := mc.Mock.Called(p, i)
+func (mc *MockCollector) collect(p string, n []string, f []string) ([]dfMetric, error) {
+	ret := mc.Mock.Called(p, n, f)
 	return ret.Get(0).([]dfMetric), ret.Error(1)
 }

@@ -73,6 +73,10 @@ var (
 		"device_name",
 		"device_type",
 	}
+	dfltExcludedFSNames = []string{
+		"/proc/sys/fs/binfmt_misc",
+		"/var/lib/docker/aufs",
+	}
 	dfltExcludedFSTypes = []string{
 		"proc",
 		"binfmt_misc",
@@ -114,6 +118,16 @@ func (p *dfCollector) setProcPath(cfg interface{}) error {
 		}
 		p.proc_path = procPath.(string)
 	}
+	excludedFSNames, err := config.GetConfigItem(cfg, "excluded_fs_names")
+	if err == nil {
+		if len(excludedFSNames.(string)) > 0 {
+			p.excluded_fs_names = strings.Split(excludedFSNames.(string), ",")
+		} else {
+			p.excluded_fs_names = []string{}
+		}
+	} else {
+		p.excluded_fs_names = dfltExcludedFSNames
+	}
 	excludedFSTypes, err := config.GetConfigItem(cfg, "excluded_fs_types")
 	if err == nil {
 		if len(excludedFSTypes.(string)) > 0 {
@@ -152,7 +166,7 @@ func (p *dfCollector) CollectMetrics(mts []plugin.MetricType) ([]plugin.MetricTy
 	}
 	metrics := []plugin.MetricType{}
 	curTime := time.Now()
-	dfms, err := p.stats.collect(p.proc_path, p.excluded_fs_types)
+	dfms, err := p.stats.collect(p.proc_path, p.excluded_fs_names, p.excluded_fs_types)
 	if err != nil {
 		return metrics, fmt.Errorf(fmt.Sprintf("Unable to collect metrics from df: %s", err))
 	}
@@ -292,6 +306,8 @@ func (p *dfCollector) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	node := cpolicy.NewPolicyNode()
 	node.Add(rule)
 	cp.Add([]string{nsVendor, nsClass, PluginName}, node)
+	rule, _ = cpolicy.NewStringRule("excluded_fs_names", false, strings.Join(dfltExcludedFSNames, ","))
+	node.Add(rule)
 	rule, _ = cpolicy.NewStringRule("excluded_fs_types", false, strings.Join(dfltExcludedFSTypes, ","))
 	node.Add(rule)
 	return cp, nil
@@ -306,6 +322,7 @@ func NewDfCollector() *dfCollector {
 		logger:            logger,
 		initializedMutex:  imutex,
 		proc_path:         procPath,
+		excluded_fs_names: dfltExcludedFSNames,
 		excluded_fs_types: dfltExcludedFSTypes,
 	}
 }
@@ -328,6 +345,7 @@ type dfCollector struct {
 	stats             collector
 	logger            *log.Logger
 	proc_path         string
+	excluded_fs_names []string
 	excluded_fs_types []string
 }
 
@@ -343,12 +361,12 @@ type dfMetric struct {
 }
 
 type collector interface {
-	collect(string, []string) ([]dfMetric, error)
+	collect(string, []string, []string) ([]dfMetric, error)
 }
 
 type dfStats struct{}
 
-func (dfs *dfStats) collect(procPath string, excluded_fs_types []string) ([]dfMetric, error) {
+func (dfs *dfStats) collect(procPath string, excluded_fs_names []string, excluded_fs_types []string) ([]dfMetric, error) {
 	dfms := []dfMetric{}
 	cpath := path.Join(procPath, "1", "mountinfo")
 	fh, err := os.Open(cpath)
@@ -375,51 +393,56 @@ func (dfs *dfStats) collect(procPath string, excluded_fs_types []string) ([]dfMe
 			return nil, fmt.Errorf("Wrong format %d fields found on the right side instead of 7 min", len(rightFields))
 		}
 		// Keep only meaningfull filesystems
-		if excludedFSType(rightFields[0], excluded_fs_types) {
+		if excludedFSFromList(leftFields[4], excluded_fs_names) {
+			log.Debug(fmt.Sprintf("Ignoring mount point %s",
+				leftFields[4]))
+			continue
+		}
+		if excludedFSFromList(rightFields[0], excluded_fs_types) {
 			log.Debug(fmt.Sprintf("Ignoring mount point %s with FS type %s",
 				leftFields[4], rightFields[0]))
-		} else {
-			var dfm dfMetric
-			dfm.Filesystem = rightFields[1]
-			dfm.FsType = rightFields[0]
-			dfm.UnchangedMountPoint = leftFields[4]
-			if leftFields[4] == "/" {
-				dfm.MountPoint = "rootfs"
-			} else {
-				dfm.MountPoint = strings.Replace(leftFields[4][1:], "/", "_", -1)
-				// Because there are mounted FS containing dots
-				// (like /etc/resolv.conf in Docker containers)
-				// and this is incompatible with Snap metric name policies
-				dfm.MountPoint = strings.Replace(dfm.MountPoint, ".", "_", -1)
-			}
-			stat := syscall.Statfs_t{}
-			err := syscall.Statfs(leftFields[4], &stat)
-			if err != nil {
-				log.Error(fmt.Sprintf("Error getting filesystem infos for %s", leftFields[4]))
-				continue
-			}
-			// Blocks
-			dfm.Blocks = (stat.Blocks * uint64(stat.Bsize)) / 1024
-			dfm.Available = (stat.Bavail * uint64(stat.Bsize)) / 1024
-			xFree := (stat.Bfree * uint64(stat.Bsize)) / 1024
-			dfm.Used = dfm.Blocks - xFree
-			percentAvailable := ceilPercent(dfm.Used, dfm.Used+dfm.Available)
-			dfm.Capacity = percentAvailable / 100.0
-			// Inodes
-			dfm.Inodes = stat.Files
-			dfm.IFree = stat.Ffree
-			dfm.IUsed = dfm.Inodes - dfm.IFree
-			percentIUsed := ceilPercent(dfm.IUsed, dfm.Inodes)
-			dfm.IUse = percentIUsed / 100.0
-			dfms = append(dfms, dfm)
+			continue
 		}
+		var dfm dfMetric
+		dfm.Filesystem = rightFields[1]
+		dfm.FsType = rightFields[0]
+		dfm.UnchangedMountPoint = leftFields[4]
+		if leftFields[4] == "/" {
+			dfm.MountPoint = "rootfs"
+		} else {
+			dfm.MountPoint = strings.Replace(leftFields[4][1:], "/", "_", -1)
+			// Because there are mounted FS containing dots
+			// (like /etc/resolv.conf in Docker containers)
+			// and this is incompatible with Snap metric name policies
+			dfm.MountPoint = strings.Replace(dfm.MountPoint, ".", "_", -1)
+		}
+		stat := syscall.Statfs_t{}
+		err := syscall.Statfs(leftFields[4], &stat)
+		if err != nil {
+			log.Error(fmt.Sprintf("Error getting filesystem infos for %s", leftFields[4]))
+			continue
+		}
+		// Blocks
+		dfm.Blocks = (stat.Blocks * uint64(stat.Bsize)) / 1024
+		dfm.Available = (stat.Bavail * uint64(stat.Bsize)) / 1024
+		xFree := (stat.Bfree * uint64(stat.Bsize)) / 1024
+		dfm.Used = dfm.Blocks - xFree
+		percentAvailable := ceilPercent(dfm.Used, dfm.Used+dfm.Available)
+		dfm.Capacity = percentAvailable / 100.0
+		// Inodes
+		dfm.Inodes = stat.Files
+		dfm.IFree = stat.Ffree
+		dfm.IUsed = dfm.Inodes - dfm.IFree
+		percentIUsed := ceilPercent(dfm.IUsed, dfm.Inodes)
+		dfm.IUse = percentIUsed / 100.0
+		dfms = append(dfms, dfm)
 	}
 	return dfms, nil
 }
 
 // Return true if filesystem should not be taken into account
-func excludedFSType(fs string, excludedFSTypes []string) bool {
-	for _, v := range excludedFSTypes {
+func excludedFSFromList(fs string, excludedFS []string) bool {
+	for _, v := range excludedFS {
 		if fs == v {
 			return true
 		}
