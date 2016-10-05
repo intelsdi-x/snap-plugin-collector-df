@@ -99,21 +99,26 @@ Create a task manifest file to use snap-plugin-collector-df plugin (exemplary fi
     "workflow": {
         "collect": {
             "metrics": {
-		        "/intel/procfs/filesystem/rootfs/space_free": {},
-                "/intel/procfs/filesystem/rootfs/space_reserved": {},
-                "/intel/procfs/filesystem/rootfs/inodes_percent_free": {},
-                "/intel/procfs/filesystem/rootfs/inodes_percent_used": {},
-                "/intel/procfs/filesystem/rootfs/device_name": {},
-                "/intel/procfs/filesystem/sys_fs_cgroup/inodes_used": {}
-           },
+                "/intel/procfs/filesystem/*/space_free": {},
+                "/intel/procfs/filesystem/*/space_reserved": {},
+                "/intel/procfs/filesystem/*/inodes_percent_free": {},
+                "/intel/procfs/filesystem/*/inodes_percent_used": {},
+                "/intel/procfs/filesystem/*/device_name": {},
+                "/intel/procfs/filesystem/*/inodes_used": {}
+            },
             "config": {
+                "/intel/procfs/filesystem": {
+                    "proc_path": "/proc",
+                    "excluded_fs_names": "/proc/sys/fs/binfmt_misc,/var/lib/docker/aufs",
+                    "excluded_fs_types": "proc,binfmt_misc,fuse.gvfsd-fuse,sysfs,cgroup,fusectl,pstore,debugfs,securityfs,devpts,mqueue,hugetlbfs,nsfs,rpc_pipefs,devtmpfs,none,tmpfs,aufs"
+                }
             },
             "process": null,
             "publish": [
                 {
                     "plugin_name": "file",
                     "config": {
-                        "file": "/tmp/published_df"
+                        "file": "/tmp/published_df.log"
                     }
                 }
             ]
