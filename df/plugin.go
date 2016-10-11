@@ -339,6 +339,7 @@ func Meta() *plugin.PluginMeta {
 		plugin.CollectorPluginType,
 		[]string{plugin.SnapGOBContentType},
 		[]string{plugin.SnapGOBContentType},
+		plugin.RoutingStrategy(plugin.StickyRouting),
 		plugin.ConcurrencyCount(1),
 	)
 }
