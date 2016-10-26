@@ -109,6 +109,7 @@ Create a task manifest file to use snap-plugin-collector-df plugin (exemplary fi
             "config": {
                 "/intel/procfs/filesystem": {
                     "proc_path": "/proc",
+                    "keep_original_mountpoint": true,
                     "excluded_fs_names": "/proc/sys/fs/binfmt_misc,/var/lib/docker/aufs",
                     "excluded_fs_types": "proc,binfmt_misc,fuse.gvfsd-fuse,sysfs,cgroup,fusectl,pstore,debugfs,securityfs,devpts,mqueue,hugetlbfs,nsfs,rpc_pipefs,devtmpfs,none,tmpfs,aufs"
                 }
