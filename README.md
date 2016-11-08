@@ -1,6 +1,6 @@
-# snap-plugin-collector-df
+# Snap plugin collector - df
 
-snap plugin for collecting free space metrics from df linux tool
+Snap plugin for collecting free space metrics from df linux tool
 
 1. [Getting Started](#getting-started)
   * [System Requirements](#system-requirements)
@@ -25,31 +25,33 @@ snap plugin for collecting free space metrics from df linux tool
 * Linux system with df command
 
 ### Operating systems
-All OSs currently supported by snap:
+All OSs currently supported by Snap:
 * Linux/amd64
 
 ### Installation
-#### Download df plugin binary:
-You can get the pre-built binaries for your OS and architecture at snap's [Github Releases](https://github.com/intelsdi-x/snap/releases) page.
+#### Download the plugin binary:
+
+You can get the pre-built binaries for your OS and architecture from the plugin's [GitHub Releases](https://github.com/intelsdi-x/snap-plugin-collector-df/releasess) page. Download the plugin from the latest release and load it into `snapd` (`/opt/snap/plugins` is the default location for snap packages).
 
 #### To build the plugin binary:
+
 Fork https://github.com/intelsdi-x/snap-plugin-collector-df
-
-Clone repo into `$GOPATH/src/github/intelsdi-x/`:
+Clone repo into `$GOPATH/src/github.com/intelsdi-x/`:
 
 ```
-$ git clone https://github.com/<yourGithubID>/snap-plugin-collector-df
+$ git clone https://github.com/<yourGithubID>/snap-plugin-collector-df.git
 ```
-Build the plugin by running make in repo:
+
+Build the snap df plugin by running make within the cloned repo:
 ```
 $ make
 ```
-This builds the plugin in `/build/rootfs`
+This builds the plugin in `./build/`
 
 ### Configuration and Usage
 
-* Set up the [snap framework](https://github.com/intelsdi-x/snap/blob/master/README.md#getting-started).
-* Load the plugin and create a task, see example in [Examples](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/README.md#examples).
+* Set up the [Snap framework](https://github.com/intelsdi-x/snap#getting-started).
+* Load the plugin and create a task, see example in [Examples](https://github.com/intelsdi-x/snap-plugin-collector-df#examples).
 
 ## Documentation
 
@@ -62,76 +64,37 @@ List of collected metrics is described in [METRICS.md](https://github.com/intels
 
 Example running snap-plugin-collector-df plugin and writing data to a file.
 
-Make sure that your `$SNAP_PATH` is set, if not:
-```
-$ export SNAP_PATH=<snapDirectoryPath>/build
-```
-Other paths to files should be set according to your configuration, using a file you should indicate where it is located.
+Ensure [snap daemon is running](https://github.com/intelsdi-x/snap#running-snap):
+* initd: `service snap-telemetry start`
+* systemd: `sysctl start snap-telemetry`
+* command line: `snapd -l 1 -t 0 &`
 
-In one terminal window, open the snap daemon (in this case with logging set to 1,  trust disabled):
+Download and load snap plugins:
 ```
-$ $SNAP_PATH/bin/snapd -l 1 -t 0
-```
-In another terminal window:
-
-Load snap-plugin-collector-df plugin:
-```
-$ $SNAP_PATH/bin/snapctl plugin load snap-plugin-collector-df
-```
-Load file plugin for publishing:
-```
-$ $SNAP_PATH/bin/snapctl plugin load $SNAP_PATH/plugin/snap-publisher-file
-```
-See available metrics:
-
-```
-$ $SNAP_PATH/bin/snapctl metric list
+$ wget http://snap.ci.snap-telemetry.io/plugins/snap-plugin-collector-df/latest/linux/x86_64/snap-plugin-collector-df
+$ wget http://snap.ci.snap-telemetry.io/plugins/snap-plugin-publisher-file/latest/linux/x86_64/snap-plugin-publisher-file
+$ chmod 755 snap-plugin-*
+$ snapctl plugin load snap-plugin-collector-df
+$ snapctl plugin load snap-plugin-publisher-file
 ```
 
-Create a task manifest file to use snap-plugin-collector-df plugin (exemplary file in [examples/task/] (https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/examples/task/)):
+See all available metrics:
 ```
-{
-    "version": 1,
-    "schedule": {
-        "type": "simple",
-        "interval": "5s"
-    },
-    "workflow": {
-        "collect": {
-            "metrics": {
-                "/intel/procfs/filesystem/*/space_free": {},
-                "/intel/procfs/filesystem/*/space_reserved": {},
-                "/intel/procfs/filesystem/*/inodes_percent_free": {},
-                "/intel/procfs/filesystem/*/inodes_percent_used": {},
-                "/intel/procfs/filesystem/*/device_name": {},
-                "/intel/procfs/filesystem/*/inodes_used": {}
-            },
-            "config": {
-                "/intel/procfs/filesystem": {
-                    "proc_path": "/proc",
-                    "keep_original_mountpoint": true,
-                    "excluded_fs_names": "/proc/sys/fs/binfmt_misc,/var/lib/docker/aufs",
-                    "excluded_fs_types": "proc,binfmt_misc,fuse.gvfsd-fuse,sysfs,cgroup,fusectl,pstore,debugfs,securityfs,devpts,mqueue,hugetlbfs,nsfs,rpc_pipefs,devtmpfs,none,tmpfs,aufs"
-                }
-            },
-            "process": null,
-            "publish": [
-                {
-                    "plugin_name": "file",
-                    "config": {
-                        "file": "/tmp/published_df.log"
-                    }
-                }
-            ]
-        }
-    }
-}
+$ snapctl metric list
+```
 
+Download an [example task file](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/examples/tasks/) and load it:
 ```
-Create a task:
+$ curl -sfLO https://raw.githubusercontent.com/intelsdi-x/snap-plugin-collector-df/master/examples/tasks/df-file.json
+$ snapctl task create -t df-file.json
+Using task manifest to create task
+Task created
+ID: 480323af-15b0-4af8-a526-eb2ca6d8ae67
+Name: Task-480323af-15b0-4af8-a526-eb2ca6d8ae67
+State: Running
 ```
-$ $SNAP_PATH/bin/snapctl task create -t df-file.json
-```
+
+See realtime output from `snapctl task watch <task_id>` (CTRL+C to exit)
 
 ### Roadmap
 There isn't a current roadmap for this plugin, but it is in active development. As we launch this plugin, we do not have any outstanding requirements for the next release.
@@ -139,7 +102,7 @@ There isn't a current roadmap for this plugin, but it is in active development. 
 If you have a feature request, please add it as an [issue](https://github.com/intelsdi-x/snap-plugin-collector-users/issues) and/or submit a [pull request](https://github.com/intelsdi-x/snap-plugin-collector-users/pulls).
 
 ## Community Support
-This repository is one of **many** plugins in **snap**, a powerful telemetry framework. See the full project at http://github.com/intelsdi-x/snap To reach out to other users, head to the [main framework](https://github.com/intelsdi-x/snap#community-support) or visit [snap Gitter channel](https://gitter.im/intelsdi-x/snap).
+This repository is one of **many** plugins in **Snap**, a powerful telemetry framework. See the full project at http://github.com/intelsdi-x/snap To reach out to other users, head to the [main framework](https://github.com/intelsdi-x/snap#community-support) or visit [Slack](http://slack.snap-telemetry.io).
 
 ## Contributing
 We love contributions!
@@ -149,7 +112,7 @@ There's more than one way to give back, from examples to blogs to code updates. 
 And **thank you!** Your contribution, through code and participation, is incredibly important to us.
 
 ## License
-[snap](http://github.com/intelsdi-x/snap), along with this plugin, is an Open Source software released under the Apache 2.0 [License](LICENSE).
+[Snap](http://github.com/intelsdi-x/snap), along with this plugin, is an Open Source software released under the Apache 2.0 [License](LICENSE).
 
 ## Acknowledgements
 
