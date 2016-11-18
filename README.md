@@ -31,7 +31,7 @@ All OSs currently supported by Snap:
 ### Installation
 #### Download the plugin binary:
 
-You can get the pre-built binaries for your OS and architecture from the plugin's [GitHub Releases](https://github.com/intelsdi-x/snap-plugin-collector-df/releasess) page. Download the plugin from the latest release and load it into `snapd` (`/opt/snap/plugins` is the default location for snap packages).
+You can get the pre-built binaries for your OS and architecture from the plugin's [GitHub Releases](https://github.com/intelsdi-x/snap-plugin-collector-df/releases) page. Download the plugin from the latest release and load it into `snapd` (`/opt/snap/plugins` is the default location for snap packages).
 
 #### To build the plugin binary:
 
@@ -51,13 +51,13 @@ This builds the plugin in `./build/`
 ### Configuration and Usage
 
 * Set up the [Snap framework](https://github.com/intelsdi-x/snap#getting-started).
-* Load the plugin and create a task, see example in [Examples](https://github.com/intelsdi-x/snap-plugin-collector-df#examples).
+* Load the plugin and create a task, see example in [Examples](#examples).
 
 ## Documentation
 
 ### Collected Metrics
 
-List of collected metrics is described in [METRICS.md](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/METRICS.md).
+List of collected metrics is described in [METRICS.md](METRICS.md).
 
 
 ### Examples
@@ -83,7 +83,7 @@ See all available metrics:
 $ snapctl metric list
 ```
 
-Download an [example task file](https://github.com/intelsdi-x/snap-plugin-collector-df/blob/master/examples/tasks/) and load it:
+Download an [example task file](examples/tasks/df-file.json) and load it:
 ```
 $ curl -sfLO https://raw.githubusercontent.com/intelsdi-x/snap-plugin-collector-df/master/examples/tasks/df-file.json
 $ snapctl task create -t df-file.json
@@ -95,11 +95,23 @@ State: Running
 ```
 
 See realtime output from `snapctl task watch <task_id>` (CTRL+C to exit)
+```
+$ snapctl task watch 480323af-15b0-4af8-a526-eb2ca6d8ae67
+```
+
+This data is published to a file `/tmp/published_df.log` per task specification
+
+Stop task:
+```
+$ snapctl task stop 480323af-15b0-4af8-a526-eb2ca6d8ae67
+Task stopped:
+ID: 480323af-15b0-4af8-a526-eb2ca6d8ae67
+```
 
 ### Roadmap
 There isn't a current roadmap for this plugin, but it is in active development. As we launch this plugin, we do not have any outstanding requirements for the next release.
 
-If you have a feature request, please add it as an [issue](https://github.com/intelsdi-x/snap-plugin-collector-users/issues) and/or submit a [pull request](https://github.com/intelsdi-x/snap-plugin-collector-users/pulls).
+If you have a feature request, please add it as an [issue](https://github.com/intelsdi-x/snap-plugin-collector-df/issues) and/or submit a [pull request](https://github.com/intelsdi-x/snap-plugin-collector-df/pulls).
 
 ## Community Support
 This repository is one of **many** plugins in **Snap**, a powerful telemetry framework. See the full project at http://github.com/intelsdi-x/snap To reach out to other users, head to the [main framework](https://github.com/intelsdi-x/snap#community-support) or visit [Slack](http://slack.snap-telemetry.io).
