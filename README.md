@@ -31,7 +31,7 @@ All OSs currently supported by Snap:
 ### Installation
 #### Download the plugin binary:
 
-You can get the pre-built binaries for your OS and architecture from the plugin's [GitHub Releases](https://github.com/intelsdi-x/snap-plugin-collector-df/releases) page. Download the plugin from the latest release and load it into `snapd` (`/opt/snap/plugins` is the default location for snap packages).
+You can get the pre-built binaries for your OS and architecture from the plugin's [GitHub Releases](https://github.com/intelsdi-x/snap-plugin-collector-df/releases) page. Download the plugin from the latest release and load it into `snapteld` (`/opt/snap/plugins` is the default location for snap packages).
 
 #### To build the plugin binary:
 
@@ -67,26 +67,26 @@ Example running snap-plugin-collector-df plugin and writing data to a file.
 Ensure [snap daemon is running](https://github.com/intelsdi-x/snap#running-snap):
 * initd: `service snap-telemetry start`
 * systemd: `sysctl start snap-telemetry`
-* command line: `snapd -l 1 -t 0 &`
+* command line: `snapteld -l 1 -t 0 &`
 
 Download and load snap plugins:
 ```
 $ wget http://snap.ci.snap-telemetry.io/plugins/snap-plugin-collector-df/latest/linux/x86_64/snap-plugin-collector-df
 $ wget http://snap.ci.snap-telemetry.io/plugins/snap-plugin-publisher-file/latest/linux/x86_64/snap-plugin-publisher-file
 $ chmod 755 snap-plugin-*
-$ snapctl plugin load snap-plugin-collector-df
-$ snapctl plugin load snap-plugin-publisher-file
+$ snaptel plugin load snap-plugin-collector-df
+$ snaptel plugin load snap-plugin-publisher-file
 ```
 
 See all available metrics:
 ```
-$ snapctl metric list
+$ snaptel metric list
 ```
 
 Download an [example task file](examples/tasks/df-file.json) and load it:
 ```
 $ curl -sfLO https://raw.githubusercontent.com/intelsdi-x/snap-plugin-collector-df/master/examples/tasks/df-file.json
-$ snapctl task create -t df-file.json
+$ snaptel task create -t df-file.json
 Using task manifest to create task
 Task created
 ID: 480323af-15b0-4af8-a526-eb2ca6d8ae67
@@ -94,16 +94,16 @@ Name: Task-480323af-15b0-4af8-a526-eb2ca6d8ae67
 State: Running
 ```
 
-See realtime output from `snapctl task watch <task_id>` (CTRL+C to exit)
+See realtime output from `snaptel task watch <task_id>` (CTRL+C to exit)
 ```
-$ snapctl task watch 480323af-15b0-4af8-a526-eb2ca6d8ae67
+$ snaptel task watch 480323af-15b0-4af8-a526-eb2ca6d8ae67
 ```
 
 This data is published to a file `/tmp/published_df.log` per task specification
 
 Stop task:
 ```
-$ snapctl task stop 480323af-15b0-4af8-a526-eb2ca6d8ae67
+$ snaptel task stop 480323af-15b0-4af8-a526-eb2ca6d8ae67
 Task stopped:
 ID: 480323af-15b0-4af8-a526-eb2ca6d8ae67
 ```
