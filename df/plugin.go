@@ -45,7 +45,7 @@ const (
 	// PluginName df collector plugin name
 	PluginName = "df"
 	// Version of plugin
-	Version = 5
+	Version = 6
 
 	nsVendor = "intel"
 	nsClass  = "procfs"
@@ -278,11 +278,11 @@ func fillMetric(kind string, dfm dfMetric, metric *plugin.MetricType) {
 	case "space_used":
 		metric.Data_ = dfm.Used
 	case "space_percent_free":
-		metric.Data_ = 100 * float64(dfm.Available) / float64(dfm.Blocks)
+		metric.Data_ = ceilPercent(dfm.Available, dfm.Blocks)
 	case "space_percent_reserved":
-		metric.Data_ = 100 * float64(dfm.Blocks-(dfm.Used+dfm.Available)) / float64(dfm.Blocks)
+		metric.Data_ = ceilPercent(dfm.Blocks-(dfm.Used+dfm.Available), dfm.Blocks)
 	case "space_percent_used":
-		metric.Data_ = 100 * float64(dfm.Used) / float64(dfm.Blocks)
+		metric.Data_ = ceilPercent(dfm.Used, dfm.Blocks)
 	case "device_name":
 		metric.Data_ = dfm.Filesystem
 	case "device_type":
@@ -294,11 +294,11 @@ func fillMetric(kind string, dfm dfMetric, metric *plugin.MetricType) {
 	case "inodes_used":
 		metric.Data_ = dfm.IUsed
 	case "inodes_percent_free":
-		metric.Data_ = 100 * float64(dfm.IFree) / float64(dfm.Inodes)
+		metric.Data_ = ceilPercent(dfm.IFree, dfm.Inodes)
 	case "inodes_percent_reserved":
-		metric.Data_ = 100 * float64(dfm.Inodes-(dfm.IUsed+dfm.IFree)) / float64(dfm.Inodes)
+		metric.Data_ = ceilPercent(dfm.Inodes-(dfm.IUsed+dfm.IFree), dfm.Inodes)
 	case "inodes_percent_used":
-		metric.Data_ = 100 * float64(dfm.IUsed) / float64(dfm.Inodes)
+		metric.Data_ = ceilPercent(dfm.IUsed, dfm.Inodes)
 	}
 }
 
@@ -367,12 +367,10 @@ type dfCollector struct {
 type dfMetric struct {
 	Filesystem              string
 	Used, Available, Blocks uint64
-	Capacity                float64
 	FsType                  string
 	MountPoint              string
 	UnchangedMountPoint     string
 	Inodes, IUsed, IFree    uint64
-	IUse                    float64
 }
 
 type collector interface {
@@ -446,14 +444,10 @@ func (dfs *dfStats) collect(procPath string, excluded_fs_names []string, exclude
 		dfm.Available = (stat.Bavail * uint64(stat.Bsize)) / 1024
 		xFree := (stat.Bfree * uint64(stat.Bsize)) / 1024
 		dfm.Used = dfm.Blocks - xFree
-		percentAvailable := ceilPercent(dfm.Used, dfm.Used+dfm.Available)
-		dfm.Capacity = percentAvailable / 100.0
 		// Inodes
 		dfm.Inodes = stat.Files
 		dfm.IFree = stat.Ffree
 		dfm.IUsed = dfm.Inodes - dfm.IFree
-		percentIUsed := ceilPercent(dfm.IUsed, dfm.Inodes)
-		dfm.IUse = percentIUsed / 100.0
 		dfms = append(dfms, dfm)
 	}
 	return dfms, nil
