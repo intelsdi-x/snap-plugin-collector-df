@@ -52,6 +52,14 @@ This builds the plugin in `./build/`
 
 * Set up the [Snap framework](https://github.com/intelsdi-x/snap#getting-started).
 * Load the plugin and create a task, see example in [Examples](#examples).
+* Available configuration:
+
+| Namespace                    | Data Type | Default Value | Description |
+|-----------------------------|----------|-------------------------|------|
+| **proc_path**                | string    | `/proc` | Path to `/proc` filesystem |
+| **excluded_fs_names**        | []string  | <ul><li>`/proc/sys/fs/binfmt_misc`</li><li>`/var/lib/docker/aufs`</li></ul> | List of excluded mount points |
+| **excluded_fs_types**        | []string  | <ul><li>`proc`</li><li>`binfmt_misc`</li><li>`fuse.gvfsd-fuse`</li><li>`sysfs`</li><li>`cgroup`</li><li>`fusectl`</li><li>`pstore`</li><li>`debugfs`</li><li>`securityfs`</li><li>`devpts`</li><li>`mqueue`</li><li>`hugetlbfs`</li><li>`nsfs`</li><li>`rpc_pipefs`</li><li>`devtmpfs`</li><li>`none`</li><li>`tmpfs`</li><li>`aufs`</li></ul> | List of excluded filesystem types |
+| **keep_original_mountpoint** | bool      | `true` | Whether original mount point names should be retained |
 
 ## Documentation
 
