@@ -101,6 +101,8 @@ var (
 		"none",
 		"tmpfs",
 		"aufs",
+		"vboxsf",
+		"fuse.lxcfs",
 	}
 )
 
